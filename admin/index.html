@@ -359,166 +359,119 @@
 
     <script type="module">
         import { GOOGLE_SCRIPT_URL } from '../js/config.js';
-        // Reuse logic from data.js but simplified for this context + admin features
-        // We need to reimplement loadWorkbook essentially to get the data
+        import { state, loadWorkbook, computeMatches } from '../js/data.js';
 
         const $ = (id) => document.getElementById(id);
-        let intersectionsData = [];
+
+        // Helper specifically for safe decoding
+        function safeDecode(s) {
+            if (!s) return "";
+            try {
+                return decodeURIComponent(s);
+            } catch (e) {
+                return s;
+            }
+        }
 
         window.showLogs = function () {
-            document.querySelector('.admin-wrap').style.display = 'block'; // Helper to show main content
-            // Actually, we have two admin-wraps now.
-            // Let's hide the intersection content and show the main adminContent internal wrap
-            document.getElementById('intersectionsContent').style.display = 'none';
             document.querySelector('#adminContent > .admin-wrap').style.display = 'block';
+            document.getElementById('intersectionsContent').style.display = 'none';
         }
 
         window.showIntersections = async function () {
             document.querySelector('#adminContent > .admin-wrap').style.display = 'none';
             document.getElementById('intersectionsContent').style.display = 'block';
 
-            if (intersectionsData.length === 0) {
+            if (state.DATA.length === 0) {
                 await loadIntersections();
             }
         }
 
         async function loadIntersections() {
             const status = $("intersectionStatus");
-            status.innerHTML = `Loading data.xlsx... <span class="spinner"></span>`;
-
-            try {
-                const url = "../data.xlsx";
-                const resp = await fetch(url, { cache: "no-store" });
-                if (!resp.ok) throw new Error(`Fetch failed (${resp.status})`);
-                const buf = await resp.arrayBuffer();
-                const wb = XLSX.read(buf, { type: "array" });
-
-                // Process workbook - simplified version of data.js processWorkbook
-                // We need to verify which sheet is which. 
-                // data.js says: Sheet1 and Sheet2.
-
-                const s1name = wb.SheetNames[0];
-                const s2name = wb.SheetNames[1]; // Provided it exists
-                const s1 = wb.Sheets[s1name];
-
-                let data = XLSX.utils.sheet_to_json(s1, { defval: null });
-
-                if (wb.SheetNames.length > 1) {
-                    const s2 = wb.Sheets[s2name];
-                    const sheet2 = XLSX.utils.sheet_to_json(s2, { defval: null });
-                    // Merge logic similar to data.js
-
-                    // Helper key finders
-                    const findKey = (row, digits) => Object.keys(row).find(k => {
-                        const s = String(k).trim().toLowerCase();
-                        return s === digits || s === `${digits}.0` || (s.includes(digits) && s.includes("car"));
-                    });
-
-                    const routeKey2 = sheet2.length ? (("Route" in sheet2[0]) ? "Route" : Object.keys(sheet2[0])[0]) : "Route";
-
-                    const map2 = new Map();
-                    for (const r of sheet2) {
-                        const route = Number(r[routeKey2]);
-                        if (!Number.isFinite(route)) continue;
-                        const row = { ...r };
-                        row.__plans = {};
-                        for (const d of ["1", "2", "3", "4", "5", "6"]) {
-                            const k = findKey(r, d);
-                            if (k) row.__plans[`${d} car`] = r[k];
-                        }
-                        map2.set(route, row);
-                    }
-
-                    const routeKey1 = data.length ? (("Route" in data[0]) ? "Route" : Object.keys(data[0])[0]) : "Route";
-                    const findCol = (row, name) => Object.keys(row).find(k => k.toLowerCase().includes(name.toLowerCase()));
-                    const streetKey = data.length ? (("STREETSORT" in data[0]) ? "STREETSORT" : findCol(data[0], "street")) : "STREETSORT";
-                    const coordKey = data.length ? (("coordinates" in data[0]) ? "coordinates" : findCol(data[0], "coord")) : "coordinates";
-
-                    intersectionsData = data.map(r => {
-                        const route = Number(r[routeKey1]);
-                        const row2 = map2.get(route) || { __plans: {} };
-                        const plans = row2.__plans || {};
-
-                        return {
-                            route: route,
-                            street: r[streetKey],
-                            coordinates: r[coordKey],
-                            car6: plans["6 car"] || null,
-                            car4: plans["4 car"] || null,
-                            car2: plans["2 car"] || null,
-                            // Store original data to help with matching updates if needed, but route+street should be unique enough
-                        };
-                    });
-
-                } else {
-                    // Fallback if single sheet
-                    intersectionsData = data;
-                }
-
+            // Use the shared data loader
+            await loadWorkbook('../data.xlsx', (kind, msg) => {
+                let color = "var(--muted)";
+                if (kind === "error") color = "var(--danger)";
+                if (kind === "ok") color = "var(--success)";
+                status.innerHTML = `<span style="color:${color}">${msg}</span>`;
+            }, () => {
                 renderIntersections();
-                status.textContent = `Loaded ${intersectionsData.length} locations.`;
-
-            } catch (e) {
-                console.error(e);
-                status.innerHTML = `<span style="color:var(--danger)">Error loading data: ${e.message}</span>`;
-            }
+            });
         }
 
-        function renderIntersections(filterText = "") {
+        function renderIntersections() {
             const tbody = $("intersectionsBody");
             tbody.innerHTML = "";
 
-            const filter = filterText.toLowerCase();
-            const filtered = intersectionsData.filter(item => {
-                if (!filter) return true;
-                return (String(item.route).includes(filter) ||
-                    String(item.street).toLowerCase().includes(filter));
-            });
+            let toShow = [];
+            const query = $("intersectionSearch").value.trim();
 
-            // Limit to first 100 for performance if no filter
-            const toShow = filter ? filtered : filtered.slice(0, 100);
+            if (query.length === 0) {
+                // Determine sort order? data.js merges sheets but doesn't strictly sort by route.
+                // We'll just show first 100 for performance.
+                toShow = state.DATA.slice(0, 100);
+            } else {
+                // data.js handles search state update when we call computeMatches
+                // But we need to set state.query first
+                state.query = query;
+                computeMatches();
+                toShow = state.matches;
+
+                // Limit to 100 for UI performance
+                if (toShow.length > 100) toShow = toShow.slice(0, 100);
+            }
 
             toShow.forEach(item => {
                 const tr = document.createElement('tr');
+                // Store RAW street name for identification (this matches what is in Excel)
+                const rawStreet = item.STREETSORT || "";
+                // Display decoded name so user sees "1ST ST" instead of "1ST%20ST"
+                const displayStreet = safeDecode(rawStreet);
+                const displayCoords = item.coordinates || "";
+
+                // We store the RAW street in a data attribute to send back to server for lookup
+                tr.setAttribute('data-route-id', item.Route);
+                tr.setAttribute('data-raw-street', rawStreet);
+
                 tr.innerHTML = `
-                    <td>${item.route || ''}</td>
-                    <td><div class="editable" data-field="name">${escape(item.street)}</div></td>
-                    <td><div class="editable" data-field="coordinates">${escape(item.coordinates)}</div></td>
-                    <td><div class="editable" data-field="6 car">${escape(item.car6)}</div></td>
-                    <td><div class="editable" data-field="4 car">${escape(item.car4)}</div></td>
-                    <td><div class="editable" data-field="2 car">${escape(item.car2)}</div></td>
+                    <td>${item.Route || ''}</td>
+                    <td><div class="editable" data-field="name">${escape(displayStreet)}</div></td>
+                    <td><div class="editable" data-field="coordinates">${escape(displayCoords)}</div></td>
+                    <td><div class="editable" data-field="6 car">${escape(item["6 car"])}</div></td>
+                    <td><div class="editable" data-field="4 car">${escape(item["4 car"])}</div></td>
+                    <td><div class="editable" data-field="2 car">${escape(item["2 car"])}</div></td>
                     <td>
-                        <button class="edit-btn" style="background:var(--accent); color:var(--bg); border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" onclick="toggleEdit(this, ${item.route})">Edit</button>
+                        <button class="edit-btn" style="background:var(--accent); color:var(--bg); border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" onclick="toggleEdit(this)">Edit</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
 
-            if (!filter && intersectionsData.length > 100) {
+            if ((query.length > 0 && state.matches.length > 100) || (query.length === 0 && state.DATA.length > 100)) {
                 const warning = document.createElement('tr');
-                warning.innerHTML = `<td colspan="7" style="text-align:center; color:var(--muted);">Showing first 100 of ${intersectionsData.length}. Use search to find specific locations.</td>`;
+                const total = query.length === 0 ? state.DATA.length : state.matches.length;
+                warning.innerHTML = `<td colspan="7" style="text-align:center; color:var(--muted);">Showing 100 of ${total.toLocaleString()}. Use search to find specific locations.</td>`;
                 tbody.appendChild(warning);
             }
         }
 
-        window.toggleEdit = function (btn, routeId) {
+        window.toggleEdit = function (btn) {
             const tr = btn.closest('tr');
             const isEditing = tr.classList.contains('editing');
 
             if (isEditing) {
-                // Save
-                saveIntersection(tr, routeId);
+                saveIntersection(tr);
             } else {
-                // To Edit Mode
                 tr.classList.add('editing');
                 btn.textContent = "Save";
                 btn.style.background = "var(--success)";
 
                 tr.querySelectorAll('.editable').forEach(div => {
-                    const val = div.innerText; // using innerText to unescape html entities if any
+                    const val = div.innerText; // innerText decodes &lt; back to < matches display
                     const input = document.createElement('input');
                     input.type = 'text';
-                    input.value = val === "null" || val === "undefined" ? "" : val;
+                    input.value = val === "null" || val === "undefined" || val === "—" ? "" : val;
                     input.style.width = "100%";
                     input.style.background = "rgba(0,0,0,0.2)";
                     input.style.border = "1px solid var(--accent)";
@@ -532,21 +485,21 @@
                 // Add Cancel button
                 const cancelBtn = document.createElement('button');
                 cancelBtn.textContent = "Cancel";
+                cancelBtn.className = "cancel-btn";
                 cancelBtn.style.cssText = "background:transparent; color:var(--danger); border:1px solid var(--danger); padding:5px 10px; border-radius:4px; cursor:pointer; margin-left:5px;";
-                cancelBtn.onclick = () => cancelEdit(tr, routeId);
+                cancelBtn.onclick = () => cancelEdit(tr);
                 btn.after(cancelBtn);
             }
         }
 
-        window.cancelEdit = function (tr, routeId) {
-            const intersection = intersectionsData.find(i => i.route === routeId && (i.street === tr.querySelector('[data-field="name"] input').defaultValue || true)); // simple reload
-            // Actually simplest is just re-render row or all.
-            // Let's just re-render all for simplicity or match finding logic
-            renderIntersections($("intersectionSearch").value);
+        window.cancelEdit = function (tr) {
+            renderIntersections();
         }
 
-        async function saveIntersection(tr, routeId) {
-            const inputs = tr.querySelectorAll('input');
+        async function saveIntersection(tr) {
+            const routeId = tr.getAttribute('data-route-id');
+            const originalRawName = tr.getAttribute('data-raw-street');
+
             const updates = {};
 
             // Collect data
@@ -563,25 +516,11 @@
                 }
             });
 
-            // To identify the record in backend, we need original values or ID
-            // We have routeId, but need original intersection name to find it if name was changed.
-            // But here we are sending the *new* values.
-            // Wait, if we change the name, how does backend find the row?
-            // Backend searches by 'route' and 'intersection'. 
-            // If we change the intersection name, we need to send the ORIGINAL name to find it.
-            // My backend logic: req.get('intersection') is used for finding.
-
-            // We need to store original name before edit.
-            // In toggleEdit, we replaced text with input.
-            // The input.defaultValue holds the original value.
-
-            const nameInput = tr.querySelector('[data-field="name"] input');
-            const originalName = nameInput.defaultValue;
-
             const btn = tr.querySelector('.edit-btn');
-            const originalText = btn.textContent;
+            const cancelBtn = tr.querySelector('.cancel-btn');
             btn.textContent = "Saving...";
             btn.disabled = true;
+            if (cancelBtn) cancelBtn.style.display = 'none';
 
             try {
                 const res = await fetch('/api/update-intersection', {
@@ -589,42 +528,55 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         route: routeId,
-                        intersection: originalName,
-                        updates: updates
+                        intersection: originalRawName, // Send RAW name to identify the row to update
+                        updates: updates               // Send NEW name to use for the update
                     })
                 });
 
                 if (res.ok) {
                     // Update local data
-                    const idx = intersectionsData.findIndex(i => i.route === routeId && i.street === originalName);
-                    if (idx !== -1) {
-                        intersectionsData[idx].street = updates.name;
-                        intersectionsData[idx].coordinates = updates.coordinates;
+                    // We need to found the item in state.DATA
+                    // Note: originalRawName is the STREETSORT key in the data
+                    const item = state.DATA.find(i => String(i.Route) === String(routeId) && i.STREETSORT === originalRawName);
+
+                    if (item) {
+                        item.STREETSORT = updates.name; // Update with new (decoded/edited) name
+                        item.coordinates = updates.coordinates;
                         if (updates.plans) {
-                            if (updates.plans['6 car']) intersectionsData[idx].car6 = updates.plans['6 car'];
-                            if (updates.plans['4 car']) intersectionsData[idx].car4 = updates.plans['4 car'];
-                            if (updates.plans['2 car']) intersectionsData[idx].car2 = updates.plans['2 car'];
+                            if (updates.plans['6 car']) item["6 car"] = updates.plans['6 car'];
+                            if (updates.plans['4 car']) item["4 car"] = updates.plans['4 car'];
+                            if (updates.plans['2 car']) item["2 car"] = updates.plans['2 car'];
                         }
                     }
 
-                    renderIntersections($("intersectionSearch").value);
                     $("intersectionStatus").innerHTML = `<span style="color:var(--success)">Saved successfully!</span>`;
                     setTimeout(() => $("intersectionStatus").textContent = "", 3000);
+
+                    // Re-render to show updated state (and update data-raw-street for next time)
+                    renderIntersections();
+
                 } else {
                     const txt = await res.text();
                     alert("Error saving: " + txt);
                     btn.textContent = "Save";
                     btn.disabled = false;
+                    if (cancelBtn) cancelBtn.style.display = 'inline-block';
                 }
             } catch (e) {
                 alert("Error: " + e.message);
                 btn.textContent = "Save";
                 btn.disabled = false;
+                if (cancelBtn) cancelBtn.style.display = 'inline-block';
             }
         }
 
+        // Debounce search
+        let debounceTimer;
         $("intersectionSearch").addEventListener('input', (e) => {
-            renderIntersections(e.target.value);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                renderIntersections();
+            }, 300);
         });
 
     </script>
