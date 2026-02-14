@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Route Admin Dashboard</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        body {
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .admin-wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        table {
+            margin-top: 20px;
+            background: rgba(18, 22, 36, 0.78);
+            border-radius: 12px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        th {
+            background: rgba(18, 22, 36, 0.95);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+            color: var(--muted);
+            padding: 12px 10px;
+        }
+
+        td {
+            border-bottom: 1px solid rgba(39, 48, 74, 0.4);
+            padding: 12px 10px;
+        }
+
+        .refresh-btn {
+            margin-top: 20px;
+            background: var(--accent);
+            color: var(--bg);
+            font-weight: bold;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: #9bbaff;
+        }
+
+        .config-warning {
+            border: 1px solid var(--danger);
+            background: rgba(255, 107, 107, 0.1);
+            color: var(--danger);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        /* Mobile-friendly responsive styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .admin-wrap {
+                padding: 0;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            table {
+                display: none;
+            }
+
+            #logBodyMobile {
+                display: block;
+            }
+
+            .log-card {
+                background: rgba(18, 22, 36, 0.78);
+                border-radius: 12px;
+                padding: 15px;
+                margin-bottom: 12px;
+                border-left: 3px solid var(--accent);
+            }
+
+            .log-card-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 10px;
+                gap: 10px;
+            }
+
+            .log-card-row:last-child {
+                margin-bottom: 0;
+            }
+
+            .log-card-label {
+                font-size: 11px;
+                color: var(--muted);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                font-weight: 600;
+                min-width: 80px;
+            }
+
+            .log-card-value {
+                flex: 1;
+                text-align: right;
+                word-break: break-word;
+            }
+
+            .refresh-btn {
+                width: 100%;
+                padding: 14px;
+                font-size: 16px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            #logBodyMobile {
+                display: none;
+            }
+
+            .table-wrapper {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        .edit-nickname-btn {
+            min-width: 32px;
+            min-height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Password Protection -->
+    <div id="passwordPrompt"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:10000;">
+        <div
+            style="background:rgba(18, 22, 36, 0.95); padding:40px; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.3); max-width:400px; width:90%;">
+            <h2 style="margin-top:0; color:var(--accent);">Admin Access</h2>
+            <p style="color:var(--muted); margin-bottom:20px;">Please enter the password to access the admin panel.</p>
+            <input type="password" id="passwordInput" placeholder="Enter password"
+                style="width:100%; padding:12px; border-radius:6px; border:1px solid rgba(124, 159, 255, 0.3); background:rgba(255,255,255,0.05); color:white; font-size:14px; margin-bottom:10px;" />
+            <div id="passwordError" style="color:var(--danger); margin-bottom:10px; font-size:13px; min-height:20px;">
+            </div>
+            <button onclick="checkPassword()"
+                style="width:100%; padding:12px; background:var(--accent); color:var(--bg); border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px;">Unlock</button>
+            <div style="margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1);">
+                <p style="color:var(--muted); font-size:12px; margin:0;">
+                    <strong>Default password:</strong> admin123<br>
+                    <em>To change the password, see the instructions in the admin HTML file.</em>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminContent" style="display:none;">
+        <div
+            style="position:fixed; top:2px; right:5px; font-size:10px; color:rgba(255,255,255,0.2); pointer-events:none; z-index:9999;">
+            v2.1</div>
+        <div class="admin-wrap">
+            <header
+                style="background:transparent; padding:0; position:relative; box-shadow:none; backdrop-filter:none;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                    <h1>Traffic Logs</h1>
+                    <div id="carsInUse"
+                        style="font-size:14px; color:var(--accent); font-weight:bold; padding-bottom:5px;"></div>
+                </div>
+                <div class="meta" style="margin-top:0;">Real-time search activity from Google Sheets</div>
+            </header>
+
+            <div id="configWarning" class="config-warning">
+                <strong>Setup Required:</strong> Please open <code>js/config.js</code> and paste your Google Web App
+                URL.
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="refresh-btn" onclick="loadLogs()">Refresh Logs</button>
+                <button class="refresh-btn" onclick="showIntersections()"
+                    style="background:rgba(124, 159, 255, 0.2); border:1px solid var(--accent);">Manage
+                    Intersections</button>
+            </div>
+            <button class="refresh-btn" onclick="loadMore()" id="loadMoreBtn"
+                style="display:none; margin-top:10px; background:rgba(124, 159, 255, 0.2); border:1px solid var(--accent);">Load
+                More (20)</button>
+            <div id="status" class="meta" style="margin-top:10px;"></div>
+
+            <!-- Desktop table view -->
+            <div class="card table-wrapper" style="box-shadow:none; background:transparent; border:none;">
+                <table>
+                    <colgroup>
+                        <col style="width:15%">
+                        <col style="width:10%">
+                        <col style="width:15%">
+                        <col style="width:20%">
+                        <col style="width:10%">
+                        <col style="width:20%">
+                        <col style="width:10%">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>User ID</th>
+                            <th>Search Query</th>
+                            <th>Top Result</th>
+                            <th>6-Car Plan</th>
+                            <th>Intersection</th>
+                            <th>Map</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Mobile card view -->
+            <div id="logBodyMobile"></div>
+        </div>
+    </div>
+
+    <!-- Intersections View -->
+    <div id="intersectionsContent" style="display:none;" class="admin-wrap">
+        <header style="background:transparent; padding:0; position:relative; box-shadow:none; backdrop-filter:none;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <h1>Intersections Manager</h1>
+                <button class="refresh-btn" onclick="showLogs()">Back to Logs</button>
+            </div>
+            <div class="meta" style="margin-top:0;">Edit intersection details and plans</div>
+        </header>
+
+        <div id="intersectionStatus" class="meta" style="margin-top:10px;"></div>
+
+        <div style="margin-top:20px; margin-bottom: 20px;">
+            <input type="text" id="intersectionSearch" placeholder="Search intersections..."
+                style="width:100%; padding:12px; border-radius:8px; border:1px solid rgba(124, 159, 255, 0.3); background:rgba(18, 22, 36, 0.78); color:white;">
+        </div>
+
+        <div class="card table-wrapper" style="box-shadow:none; background:transparent; border:none;">
+            <table id="intersectionsTable">
+                <colgroup>
+                    <col style="width:10%">
+                    <col style="width:25%">
+                    <col style="width:20%">
+                    <col style="width:10%">
+                    <col style="width:10%">
+                    <col style="width:10%">
+                    <col style="width:15%">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Route</th>
+                        <th>Intersection</th>
+                        <th>Coordinates</th>
+                        <th>6 Car</th>
+                        <th>4 Car</th>
+                        <th>2 Car</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="intersectionsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        // Password protection using SHA-256 hash
+        // Current password: "admin123"
+        // To change: Replace the hash below with a new SHA-256 hash of your desired password
+        // Generate hash at: https://emn178.github.io/online-tools/sha256.html
+        const PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // admin123
+
+        async function hashPassword(password) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function checkPassword() {
+            const input = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('passwordError');
+
+            if (!input) {
+                errorDiv.textContent = 'Please enter a password';
+                return;
+            }
+
+            const hash = await hashPassword(input);
+
+            if (hash === PASSWORD_HASH) {
+                sessionStorage.setItem('admin_authenticated', 'true');
+                document.getElementById('passwordPrompt').style.display = 'none';
+                document.getElementById('adminContent').style.display = 'block';
+            } else {
+                errorDiv.textContent = 'Incorrect password. Please try again.';
+                document.getElementById('passwordInput').value = '';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const passwordInput = document.getElementById('passwordInput');
+            if (passwordInput) {
+                passwordInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        checkPassword();
+                    }
+                });
+                passwordInput.focus();
+            }
+
+            if (sessionStorage.getItem('admin_authenticated') === 'true') {
+                document.getElementById('passwordPrompt').style.display = 'none';
+                document.getElementById('adminContent').style.display = 'block';
+            }
+        });
+
+        // Determine Cars in Use based on time
+        function updateCarsInUse() {
+            const now = new Date();
+            const minutes = now.getHours() * 60 + now.getMinutes();
+            let label = "2-car"; // Default (10:30 PM - 6:30 AM)
+
+            // 6:30 AM (390) - 2:30 PM (870)
+            if (minutes >= 390 && minutes < 870) {
+                label = "6-car";
+            }
+            // 2:30 PM (870) - 10:30 PM (1350)
+            else if (minutes >= 870 && minutes < 1350) {
+                label = "4-car";
+            }
+
+            const el = document.getElementById('carsInUse');
+            if (el) el.textContent = `Cars in Use: ${label}`;
+        }
+        updateCarsInUse();
+        setInterval(updateCarsInUse, 60000);
+    </script>
+
+    <script type="module">
+        import { GOOGLE_SCRIPT_URL } from '../js/config.js';
+        // Reuse logic from data.js but simplified for this context + admin features
+        // We need to reimplement loadWorkbook essentially to get the data
+
+        const $ = (id) => document.getElementById(id);
+        let intersectionsData = [];
+
+        window.showLogs = function () {
+            document.querySelector('.admin-wrap').style.display = 'block'; // Helper to show main content
+            // Actually, we have two admin-wraps now.
+            // Let's hide the intersection content and show the main adminContent internal wrap
+            document.getElementById('intersectionsContent').style.display = 'none';
+            document.querySelector('#adminContent > .admin-wrap').style.display = 'block';
+        }
+
+        window.showIntersections = async function () {
+            document.querySelector('#adminContent > .admin-wrap').style.display = 'none';
+            document.getElementById('intersectionsContent').style.display = 'block';
+
+            if (intersectionsData.length === 0) {
+                await loadIntersections();
+            }
+        }
+
+        async function loadIntersections() {
+            const status = $("intersectionStatus");
+            status.innerHTML = `Loading data.xlsx... <span class="spinner"></span>`;
+
+            try {
+                const url = "../data.xlsx";
+                const resp = await fetch(url, { cache: "no-store" });
+                if (!resp.ok) throw new Error(`Fetch failed (${resp.status})`);
+                const buf = await resp.arrayBuffer();
+                const wb = XLSX.read(buf, { type: "array" });
+
+                // Process workbook - simplified version of data.js processWorkbook
+                // We need to verify which sheet is which. 
+                // data.js says: Sheet1 and Sheet2.
+
+                const s1name = wb.SheetNames[0];
+                const s2name = wb.SheetNames[1]; // Provided it exists
+                const s1 = wb.Sheets[s1name];
+
+                let data = XLSX.utils.sheet_to_json(s1, { defval: null });
+
+                if (wb.SheetNames.length > 1) {
+                    const s2 = wb.Sheets[s2name];
+                    const sheet2 = XLSX.utils.sheet_to_json(s2, { defval: null });
+                    // Merge logic similar to data.js
+
+                    // Helper key finders
+                    const findKey = (row, digits) => Object.keys(row).find(k => {
+                        const s = String(k).trim().toLowerCase();
+                        return s === digits || s === `${digits}.0` || (s.includes(digits) && s.includes("car"));
+                    });
+
+                    const routeKey2 = sheet2.length ? (("Route" in sheet2[0]) ? "Route" : Object.keys(sheet2[0])[0]) : "Route";
+
+                    const map2 = new Map();
+                    for (const r of sheet2) {
+                        const route = Number(r[routeKey2]);
+                        if (!Number.isFinite(route)) continue;
+                        const row = { ...r };
+                        row.__plans = {};
+                        for (const d of ["1", "2", "3", "4", "5", "6"]) {
+                            const k = findKey(r, d);
+                            if (k) row.__plans[`${d} car`] = r[k];
+                        }
+                        map2.set(route, row);
+                    }
+
+                    const routeKey1 = data.length ? (("Route" in data[0]) ? "Route" : Object.keys(data[0])[0]) : "Route";
+                    const findCol = (row, name) => Object.keys(row).find(k => k.toLowerCase().includes(name.toLowerCase()));
+                    const streetKey = data.length ? (("STREETSORT" in data[0]) ? "STREETSORT" : findCol(data[0], "street")) : "STREETSORT";
+                    const coordKey = data.length ? (("coordinates" in data[0]) ? "coordinates" : findCol(data[0], "coord")) : "coordinates";
+
+                    intersectionsData = data.map(r => {
+                        const route = Number(r[routeKey1]);
+                        const row2 = map2.get(route) || { __plans: {} };
+                        const plans = row2.__plans || {};
+
+                        return {
+                            route: route,
+                            street: r[streetKey],
+                            coordinates: r[coordKey],
+                            car6: plans["6 car"] || null,
+                            car4: plans["4 car"] || null,
+                            car2: plans["2 car"] || null,
+                            // Store original data to help with matching updates if needed, but route+street should be unique enough
+                        };
+                    });
+
+                } else {
+                    // Fallback if single sheet
+                    intersectionsData = data;
+                }
+
+                renderIntersections();
+                status.textContent = `Loaded ${intersectionsData.length} locations.`;
+
+            } catch (e) {
+                console.error(e);
+                status.innerHTML = `<span style="color:var(--danger)">Error loading data: ${e.message}</span>`;
+            }
+        }
+
+        function renderIntersections(filterText = "") {
+            const tbody = $("intersectionsBody");
+            tbody.innerHTML = "";
+
+            const filter = filterText.toLowerCase();
+            const filtered = intersectionsData.filter(item => {
+                if (!filter) return true;
+                return (String(item.route).includes(filter) ||
+                    String(item.street).toLowerCase().includes(filter));
+            });
+
+            // Limit to first 100 for performance if no filter
+            const toShow = filter ? filtered : filtered.slice(0, 100);
+
+            toShow.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.route || ''}</td>
+                    <td><div class="editable" data-field="name">${escape(item.street)}</div></td>
+                    <td><div class="editable" data-field="coordinates">${escape(item.coordinates)}</div></td>
+                    <td><div class="editable" data-field="6 car">${escape(item.car6)}</div></td>
+                    <td><div class="editable" data-field="4 car">${escape(item.car4)}</div></td>
+                    <td><div class="editable" data-field="2 car">${escape(item.car2)}</div></td>
+                    <td>
+                        <button class="edit-btn" style="background:var(--accent); color:var(--bg); border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" onclick="toggleEdit(this, ${item.route})">Edit</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (!filter && intersectionsData.length > 100) {
+                const warning = document.createElement('tr');
+                warning.innerHTML = `<td colspan="7" style="text-align:center; color:var(--muted);">Showing first 100 of ${intersectionsData.length}. Use search to find specific locations.</td>`;
+                tbody.appendChild(warning);
+            }
+        }
+
+        window.toggleEdit = function (btn, routeId) {
+            const tr = btn.closest('tr');
+            const isEditing = tr.classList.contains('editing');
+
+            if (isEditing) {
+                // Save
+                saveIntersection(tr, routeId);
+            } else {
+                // To Edit Mode
+                tr.classList.add('editing');
+                btn.textContent = "Save";
+                btn.style.background = "var(--success)";
+
+                tr.querySelectorAll('.editable').forEach(div => {
+                    const val = div.innerText; // using innerText to unescape html entities if any
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = val === "null" || val === "undefined" ? "" : val;
+                    input.style.width = "100%";
+                    input.style.background = "rgba(0,0,0,0.2)";
+                    input.style.border = "1px solid var(--accent)";
+                    input.style.color = "white";
+                    input.style.padding = "4px";
+
+                    div.innerHTML = '';
+                    div.appendChild(input);
+                });
+
+                // Add Cancel button
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = "Cancel";
+                cancelBtn.style.cssText = "background:transparent; color:var(--danger); border:1px solid var(--danger); padding:5px 10px; border-radius:4px; cursor:pointer; margin-left:5px;";
+                cancelBtn.onclick = () => cancelEdit(tr, routeId);
+                btn.after(cancelBtn);
+            }
+        }
+
+        window.cancelEdit = function (tr, routeId) {
+            const intersection = intersectionsData.find(i => i.route === routeId && (i.street === tr.querySelector('[data-field="name"] input').defaultValue || true)); // simple reload
+            // Actually simplest is just re-render row or all.
+            // Let's just re-render all for simplicity or match finding logic
+            renderIntersections($("intersectionSearch").value);
+        }
+
+        async function saveIntersection(tr, routeId) {
+            const inputs = tr.querySelectorAll('input');
+            const updates = {};
+
+            // Collect data
+            tr.querySelectorAll('.editable').forEach(div => {
+                const field = div.getAttribute('data-field');
+                const input = div.querySelector('input');
+                const val = input.value;
+
+                if (field === 'name') updates.name = val;
+                else if (field === 'coordinates') updates.coordinates = val;
+                else {
+                    if (!updates.plans) updates.plans = {};
+                    updates.plans[field] = val;
+                }
+            });
+
+            // To identify the record in backend, we need original values or ID
+            // We have routeId, but need original intersection name to find it if name was changed.
+            // But here we are sending the *new* values.
+            // Wait, if we change the name, how does backend find the row?
+            // Backend searches by 'route' and 'intersection'. 
+            // If we change the intersection name, we need to send the ORIGINAL name to find it.
+            // My backend logic: req.get('intersection') is used for finding.
+
+            // We need to store original name before edit.
+            // In toggleEdit, we replaced text with input.
+            // The input.defaultValue holds the original value.
+
+            const nameInput = tr.querySelector('[data-field="name"] input');
+            const originalName = nameInput.defaultValue;
+
+            const btn = tr.querySelector('.edit-btn');
+            const originalText = btn.textContent;
+            btn.textContent = "Saving...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/update-intersection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        route: routeId,
+                        intersection: originalName,
+                        updates: updates
+                    })
+                });
+
+                if (res.ok) {
+                    // Update local data
+                    const idx = intersectionsData.findIndex(i => i.route === routeId && i.street === originalName);
+                    if (idx !== -1) {
+                        intersectionsData[idx].street = updates.name;
+                        intersectionsData[idx].coordinates = updates.coordinates;
+                        if (updates.plans) {
+                            if (updates.plans['6 car']) intersectionsData[idx].car6 = updates.plans['6 car'];
+                            if (updates.plans['4 car']) intersectionsData[idx].car4 = updates.plans['4 car'];
+                            if (updates.plans['2 car']) intersectionsData[idx].car2 = updates.plans['2 car'];
+                        }
+                    }
+
+                    renderIntersections($("intersectionSearch").value);
+                    $("intersectionStatus").innerHTML = `<span style="color:var(--success)">Saved successfully!</span>`;
+                    setTimeout(() => $("intersectionStatus").textContent = "", 3000);
+                } else {
+                    const txt = await res.text();
+                    alert("Error saving: " + txt);
+                    btn.textContent = "Save";
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert("Error: " + e.message);
+                btn.textContent = "Save";
+                btn.disabled = false;
+            }
+        }
+
+        $("intersectionSearch").addEventListener('input', (e) => {
+            renderIntersections(e.target.value);
+        });
+
+    </script>
+    <script type="module">
+        import { GOOGLE_SCRIPT_URL } from '../js/config.js';
+
+        const $ = (id) => document.getElementById(id);
+        let nicknamesCache = {};
+        let allLogs = [];
+        let displayedCount = 0;
+        const LOGS_PER_PAGE = 20;
+
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (err) {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    return true;
+                } catch (e) {
+                    document.body.removeChild(textArea);
+                    return false;
+                }
+            }
+        }
+
+        async function loadNicknamesFromSheets() {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("YOUR_")) {
+                const stored = localStorage.getItem('device_nicknames');
+                nicknamesCache = stored ? JSON.parse(stored) : {};
+                return;
+            }
+
+            try {
+                const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=getNicknames`);
+                if (res.ok) {
+                    nicknamesCache = await res.json();
+                    localStorage.setItem('device_nicknames', JSON.stringify(nicknamesCache));
+                }
+            } catch (err) {
+                console.warn('Failed to load nicknames from Google Sheets, using localStorage:', err);
+                const stored = localStorage.getItem('device_nicknames');
+                nicknamesCache = stored ? JSON.parse(stored) : {};
+            }
+        }
+
+        async function saveNicknameToSheets(deviceId, nickname) {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("YOUR_")) {
+                setNicknameLocal(deviceId, nickname);
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    action: 'setNickname',
+                    deviceId: deviceId,
+                    nickname: nickname || ''
+                });
+
+                const res = await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`);
+
+                if (res.ok) {
+                    if (nickname && nickname.trim()) {
+                        nicknamesCache[deviceId] = nickname.trim();
+                    } else {
+                        delete nicknamesCache[deviceId];
+                    }
+                    localStorage.setItem('device_nicknames', JSON.stringify(nicknamesCache));
+                }
+            } catch (err) {
+                console.error('Failed to save nickname to Google Sheets:', err);
+                setNicknameLocal(deviceId, nickname);
+            }
+        }
+
+        function setNicknameLocal(deviceId, nickname) {
+            if (nickname && nickname.trim()) {
+                nicknamesCache[deviceId] = nickname.trim();
+            } else {
+                delete nicknamesCache[deviceId];
+            }
+            localStorage.setItem('device_nicknames', JSON.stringify(nicknamesCache));
+        }
+
+        function getDisplayName(deviceId) {
+            return nicknamesCache[deviceId] || deviceId;
+        }
+
+        function renderLogs(start, end, clearFirst) {
+            const tbody = $("logBody");
+            const mobileBody = $("logBodyMobile");
+            const logsToRender = allLogs.slice(start, end);
+
+            if (logsToRender.length === 0) return;
+
+            const desktopHTML = logsToRender.map(l => {
+                let timeStr = l.timestamp;
+                try { timeStr = new Date(l.timestamp).toLocaleString(); } catch (e) { }
+
+                let mapLink = "—";
+                if (l.location) {
+                    mapLink = `<a href="https://www.google.com/maps?q=${l.location}" target="_blank" style="color:var(--accent)">View</a>`;
+                }
+
+                const deviceId = l.user || "Unknown";
+                const displayName = getDisplayName(deviceId);
+                const isNicknamed = displayName !== deviceId;
+
+                // Strip everything after " (" for the copy value to remove YARD/Division
+                const routeOnly = l.topResultSummary ? l.topResultSummary.split(" (")[0].trim() : "";
+
+                return `
+                <tr>
+                    <td>${escape(timeStr)}</td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="pill" style="display:inline-flex; border:none; background:${isNicknamed ? 'rgba(124, 159, 255, 0.15)' : 'rgba(255,255,255,0.05)'}; font-size:13px; padding:4px 10px;" title="Device ID: ${escape(deviceId)}">${escape(displayName)}</span>
+                            <button class="edit-nickname-btn" data-device-id="${escape(deviceId)}" style="font-size:9px; padding:2px 4px; background:transparent; border:1px solid var(--accent); color:var(--accent); cursor:pointer; border-radius:3px;" title="Edit nickname">✏️</button>
+                        </div>
+                    </td>
+                    <td style="color:var(--accent)">${escape(l.query)}</td>
+                    <td><span class="copy-route" data-route="${escape(routeOnly)}" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted;" title="Click to copy">${escape(l.topResultSummary)}</span></td>
+                    <td style="color:#ffd700">${escape(l.sixCar || "-")}</td>
+                    <td>${escape(l.intersection)}</td>
+                    <td>${mapLink}</td>
+                </tr>
+            `}).join("");
+
+            const mobileHTML = logsToRender.map(l => {
+                let timeStr = l.timestamp;
+                try { timeStr = new Date(l.timestamp).toLocaleString(); } catch (e) { }
+
+                const deviceId = l.user || "Unknown";
+                const displayName = getDisplayName(deviceId);
+                const isNicknamed = displayName !== deviceId;
+
+                let mapLink = "—";
+                if (l.location) {
+                    mapLink = `<a href="https://www.google.com/maps?q=${l.location}" target="_blank" style="color:var(--accent)">View Map</a>`;
+                }
+
+                return `
+                <div class="log-card">
+                    <div class="log-card-row">
+                        <span class="log-card-label">Time</span>
+                        <span class="log-card-value">${escape(timeStr)}</span>
+                    </div>
+                    <div class="log-card-row">
+                        <span class="log-card-label">User</span>
+                        <div class="log-card-value" style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                            <span class="pill" style="display:inline-flex; border:none; background:${isNicknamed ? 'rgba(124, 159, 255, 0.15)' : 'rgba(255,255,255,0.05)'}; font-size:18px; padding:6px 12px; font-weight:500; flex-grow:1; justify-content:center;" title="Device ID: ${escape(deviceId)}">${escape(displayName)}</span>
+                            <button class="edit-nickname-btn-mobile" data-device-id="${escape(deviceId)}" style="font-size:8px; padding:3px 5px; background:transparent; border:1px solid rgba(124, 159, 255, 0.5); color:var(--accent); cursor:pointer; border-radius:3px; flex-shrink:0; width:28px;" title="Edit nickname">✏️</button>
+                        </div>
+                    </div>
+                    <div class="log-card-row">
+                        <span class="log-card-label">Query</span>
+                        <span class="log-card-value" style="color:var(--accent)">${escape(l.query)}</span>
+                    </div>
+                    <div class="log-card-row">
+                        <span class="log-card-label">Result</span>
+                        <span class="log-card-value"><span class="copy-route" data-route="${escape(l.topResultSummary ? l.topResultSummary.split(" (")[0].trim() : "")}" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted;" title="Click to copy">${escape(l.topResultSummary)}</span></span>
+                    </div>
+                    ${l.sixCar ? `
+                    <div class="log-card-row">
+                        <span class="log-card-label">6-Car</span>
+                        <span class="log-card-value" style="color:#ffd700">${escape(l.sixCar)}</span>
+                    </div>` : ''}
+                    <div class="log-card-row">
+                        <span class="log-card-label">Location</span>
+                        <span class="log-card-value">${escape(l.intersection)}</span>
+                    </div>
+                    <div class="log-card-row">
+                        <span class="log-card-label">Map</span>
+                        <span class="log-card-value">${mapLink}</span>
+                    </div>
+                </div>
+            `}).join("");
+
+            if (clearFirst) {
+                tbody.innerHTML = desktopHTML;
+                mobileBody.innerHTML = mobileHTML;
+            } else {
+                tbody.innerHTML += desktopHTML;
+                mobileBody.innerHTML += mobileHTML;
+            }
+
+            // Add click events for route copying
+            document.querySelectorAll('.copy-route').forEach(el => {
+                el.addEventListener('click', async function () {
+                    const route = this.getAttribute('data-route');
+                    const success = await copyToClipboard(route);
+                    if (success) {
+                        const originalText = this.textContent;
+                        this.textContent = '✓ Copied!';
+                        this.style.color = 'var(--success)';
+                        setTimeout(() => {
+                            this.textContent = originalText;
+                            this.style.color = '';
+                        }, 1500);
+                    }
+                });
+            });
+
+            // Add edit nickname listeners
+            document.querySelectorAll('.edit-nickname-btn, .edit-nickname-btn-mobile').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const deviceId = btn.getAttribute('data-device-id');
+                    const currentNickname = getDisplayName(deviceId);
+                    const prompt_text = deviceId === currentNickname
+                        ? `Enter a nickname for device "${deviceId}":`
+                        : `Edit nickname for device "${deviceId}"\nCurrent: "${currentNickname}"`;
+
+                    const newNickname = prompt(prompt_text, deviceId === currentNickname ? "" : currentNickname);
+
+                    if (newNickname !== null) {
+                        const status = $("status");
+                        status.innerHTML = `Saving... <span class="spinner"></span>`;
+                        await saveNicknameToSheets(deviceId, newNickname);
+                        status.innerHTML = `<span style="color:var(--success)">Nickname saved!</span>`;
+                        setTimeout(() => loadLogs(), 500);
+                    }
+                });
+            });
+        }
+
+        window.loadLogs = async function () {
+            const status = $("status");
+            const tbody = $("logBody");
+            const mobileBody = $("logBodyMobile");
+            const loadMoreBtn = $("loadMoreBtn");
+
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("YOUR_")) {
+                $("configWarning").style.display = "block";
+                status.innerHTML = `<span style="color:var(--danger)">Configuration Missing</span>`;
+                return;
+            }
+
+            status.innerHTML = `Loading from Google Sheets... <span class="spinner"></span>`;
+            if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+
+            await loadNicknamesFromSheets();
+
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL);
+                if (!res.ok) throw new Error("Failed to fetch");
+
+                allLogs = await res.json();
+                displayedCount = 0;
+
+                if (allLogs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--muted)">No logs found yet.</td></tr>`;
+                    mobileBody.innerHTML = `<div style="text-align:center; padding:20px; color:var(--muted)">No logs found yet.</div>`;
+                    status.textContent = `No logs found.`;
+                } else {
+                    // Load first batch
+                    const initialCount = Math.min(LOGS_PER_PAGE, allLogs.length);
+                    renderLogs(0, initialCount, true);
+                    displayedCount = initialCount;
+
+                    // Show Load More button if there are more logs
+                    if (displayedCount < allLogs.length && loadMoreBtn) {
+                        loadMoreBtn.style.display = 'block';
+                        const remaining = allLogs.length - displayedCount;
+                        loadMoreBtn.textContent = `Load More (${Math.min(LOGS_PER_PAGE, remaining)} of ${remaining} remaining)`;
+                    }
+
+                    status.textContent = `Loaded ${displayedCount} of ${allLogs.length} logs.`;
+                }
+            } catch (err) {
+                status.innerHTML = `<span style="color:var(--danger)">Error: ${err.message}</span>. Check console & CORS settings.`;
+            }
+        };
+
+        window.loadMore = function () {
+            const status = $("status");
+            const loadMoreBtn = $("loadMoreBtn");
+
+            const nextCount = Math.min(displayedCount + LOGS_PER_PAGE, allLogs.length);
+            renderLogs(displayedCount, nextCount, false);
+            displayedCount = nextCount;
+
+            if (displayedCount >= allLogs.length) {
+                if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+            } else if (loadMoreBtn) {
+                const remaining = allLogs.length - displayedCount;
+                loadMoreBtn.textContent = `Load More (${Math.min(LOGS_PER_PAGE, remaining)} of ${remaining} remaining)`;
+            }
+
+            status.textContent = `Loaded ${displayedCount} of ${allLogs.length} logs.`;
+        };
+
+        function escape(s) {
+            return String(s || "").replaceAll("<", "&lt;");
+        }
+
+        loadLogs();
+    </script>
+</body>
+
+</html>

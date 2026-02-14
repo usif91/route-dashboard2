@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Ranking Test</title>
+</head>
+
+<body>
+    <h1>Search Ranking Test</h1>
+    <p>Open the browser console to see results</p>
+
+    <script type="module">
+        // Mock utils
+        function normalizeForTokens(s) {
+            return (s ?? "").toString().toUpperCase()
+                .replace(/&/g, " ").replace(/[,.;:/\\()\[\]{}'"\`~!@#$%^*+=<>?|-]/g, " ")
+                .replace(/\s+/g, " ").trim();
+        }
+
+        // Mock state
+        const state = { synonyms: new Map() };
+
+        function tokenizeQuery(q) {
+            return normalizeForTokens(q).split(" ").filter(Boolean).filter(t => t !== "AND");
+        }
+
+        function haystackForMode(item) {
+            return normalizeForTokens(item.STREETSORT);
+        }
+
+        function calculateScore(item, query) {
+            const haystack = haystackForMode(item);
+            const tokens = tokenizeQuery(query);
+            let totalScore = 0;
+
+            for (const token of tokens) {
+                const alts = state.synonyms.get(token) || [token];
+                let bestScoreForToken = -10000;
+
+                let foundAny = false;
+                for (const alt of alts) {
+                    // Find all occurrences of this token as a complete word
+                    const haystackTokens = haystack.split(' ');
+
+                    for (let i = 0; i < haystackTokens.length; i++) {
+                        const haystackToken = haystackTokens[i];
+
+                        // Check if the haystack token starts with the search token
+                        if (haystackToken.startsWith(alt)) {
+                            foundAny = true;
+
+                            // Calculate the character position in the original haystack
+                            const charPos = haystackTokens.slice(0, i).join(' ').length + (i > 0 ? 1 : 0);
+
+                            let score = 0;
+
+                            // 1. Bonus for start of string
+                            if (charPos === 0) score += 1000;
+                            // 2. Bonus for word boundary (which all these are by definition)
+                            else score += 500;
+
+                            // 3. Bonus for exact match (not just prefix)
+                            if (haystackToken === alt) score += 100;
+
+                            // 4. Penalty for distance from start
+                            score -= charPos;
+
+                            if (score > bestScoreForToken) bestScoreForToken = score;
+                        }
+                    }
+                }
+
+                if (foundAny) {
+                    totalScore += bestScoreForToken;
+                }
+            }
+            return totalScore;
+        }
+
+        const item1 = { STREETSORT: "7th av & exposition bl" };
+        const item2 = { STREETSORT: "37th st,exposition bl & figueroa" };
+        const query = "7th and expo";
+
+        const s1 = calculateScore(item1, query);
+        const s2 = calculateScore(item2, query);
+
+        console.log("Query:", query);
+        console.log(`"${item1.STREETSORT}" Score:`, s1);
+        console.log(`"${item2.STREETSORT}" Score:`, s2);
+
+        if (s1 > s2) {
+            console.log("✓ SUCCESS: Item 1 ranks higher than Item 2");
+        } else {
+            console.log("✗ FAILURE: Item 1 does not rank higher than Item 2");
+        }
+    </script>
+</body>
+
+</html>
