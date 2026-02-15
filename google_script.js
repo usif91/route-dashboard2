@@ -5,11 +5,51 @@ function doGet(e) {
         return getNicknames();
     }
 
-    if (action === "getData") {
-        return getData();
+    if (action === "getLogs") {
+        return getLogs();
     }
 
-    return getLogs();
+    if (action === "setNickname") {
+        return setNickname(e);
+    }
+
+    // Default to getData if no action specified (for robustness)
+    return getData();
+}
+
+function setNickname(e) {
+    const deviceId = e.parameter.deviceId;
+    const nickname = e.parameter.nickname;
+    if (!deviceId) return ContentService.createTextOutput("Missing deviceId").setMimeType(ContentService.MimeType.TEXT);
+
+    let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("nicknames");
+    if (!sheet) {
+        sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet("nicknames");
+        sheet.appendRow(["Device ID", "Nickname"]);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+
+    // Find existing row (skip header)
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(deviceId)) {
+            rowIndex = i;
+            break;
+        }
+    }
+
+    if (rowIndex !== -1) {
+        if (nickname) {
+            sheet.getRange(rowIndex + 1, 2).setValue(nickname);
+        } else {
+            sheet.deleteRow(rowIndex + 1);
+        }
+    } else if (nickname) {
+        sheet.appendRow([deviceId, nickname]);
+    }
+
+    return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
 }
 
 function doPost(e) {
