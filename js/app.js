@@ -61,7 +61,7 @@ function handleTableClick(e) {
 
 
                 // Add new lines as requested
-                textToCopy = `${formattedDate}\n${dateStr}\n${route}\n${street}`.trim();
+                textToCopy = `${now}\n${dateStr}\n${route}\n${street}`.trim();
             } else {
                 // Home Page: Copy only intersection
                 textToCopy = street.trim();
@@ -172,4 +172,5 @@ loadWorkbook(null, setStatus, () => {
     computeMatches();
     renderNext(true);
 });
+
 
