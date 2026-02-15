@@ -108,7 +108,7 @@ function processSheets(data) {
                 YARD: r[yardKey] ? safeDecode(r[yardKey]) : null,
                 STREETSORT: r[streetKey] ? safeDecode(r[streetKey]) : null,
                 _RAW_STREET: r[streetKey], // Keep original for updates
-                coordinates: r.coordinates ?? null,
+                coordinates: r.coordinates ? safeDecode(String(r.coordinates)) : null,
             };
 
             // Map plans
