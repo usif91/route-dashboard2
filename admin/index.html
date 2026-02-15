@@ -363,14 +363,9 @@
 
         const $ = (id) => document.getElementById(id);
 
-        // Helper specifically for safe decoding
         function safeDecode(s) {
             if (!s) return "";
-            try {
-                return decodeURIComponent(s);
-            } catch (e) {
-                return s;
-            }
+            try { return decodeURIComponent(s); } catch (e) { return s; }
         }
 
         window.showLogs = function () {
@@ -389,8 +384,7 @@
 
         async function loadIntersections() {
             const status = $("intersectionStatus");
-            // Use the shared data loader
-            await loadWorkbook('../data.xlsx', (kind, msg) => {
+            await loadWorkbook('FULL_MIGRATION', (kind, msg) => {
                 let color = "var(--muted)";
                 if (kind === "error") color = "var(--danger)";
                 if (kind === "ok") color = "var(--success)";
@@ -408,36 +402,29 @@
             const query = $("intersectionSearch").value.trim();
 
             if (query.length === 0) {
-                // Determine sort order? data.js merges sheets but doesn't strictly sort by route.
-                // We'll just show first 100 for performance.
                 toShow = state.DATA.slice(0, 100);
             } else {
-                // data.js handles search state update when we call computeMatches
-                // But we need to set state.query first
                 state.query = query;
                 computeMatches();
                 toShow = state.matches;
-
-                // Limit to 100 for UI performance
                 if (toShow.length > 100) toShow = toShow.slice(0, 100);
             }
 
             toShow.forEach(item => {
                 const tr = document.createElement('tr');
-                // Store RAW street name for identification (this matches what is in Excel)
                 const rawStreet = item.STREETSORT || "";
-                // Display decoded name so user sees "1ST ST" instead of "1ST%20ST"
                 const displayStreet = safeDecode(rawStreet);
                 const displayCoords = item.coordinates || "";
 
-                // We store the RAW street in a data attribute to send back to server for lookup
                 tr.setAttribute('data-route-id', item.Route);
                 tr.setAttribute('data-raw-street', rawStreet);
+
+                const mapLink = displayCoords ? `<a href="https://www.google.com/maps?q=${displayCoords}" target="_blank" style="text-decoration:none; margin-left:5px;">📍</a>` : "";
 
                 tr.innerHTML = `
                     <td>${item.Route || ''}</td>
                     <td><div class="editable" data-field="name">${escape(displayStreet)}</div></td>
-                    <td><div class="editable" data-field="coordinates">${escape(displayCoords)}</div></td>
+                    <td><div class="editable" data-field="coordinates">${escape(displayCoords)}${mapLink}</div></td>
                     <td><div class="editable" data-field="6 car">${escape(item["6 car"])}</div></td>
                     <td><div class="editable" data-field="4 car">${escape(item["4 car"])}</div></td>
                     <td><div class="editable" data-field="2 car">${escape(item["2 car"])}</div></td>
@@ -468,7 +455,11 @@
                 btn.style.background = "var(--success)";
 
                 tr.querySelectorAll('.editable').forEach(div => {
-                    const val = div.innerText; // innerText decodes &lt; back to < matches display
+                    const clone = div.cloneNode(true);
+                    const link = clone.querySelector('a');
+                    if (link) link.remove();
+                    const val = clone.innerText.trim();
+
                     const input = document.createElement('input');
                     input.type = 'text';
                     input.value = val === "null" || val === "undefined" || val === "—" ? "" : val;
@@ -482,7 +473,6 @@
                     div.appendChild(input);
                 });
 
-                // Add Cancel button
                 const cancelBtn = document.createElement('button');
                 cancelBtn.textContent = "Cancel";
                 cancelBtn.className = "cancel-btn";
@@ -501,8 +491,6 @@
             const originalRawName = tr.getAttribute('data-raw-street');
 
             const updates = {};
-
-            // Collect data
             tr.querySelectorAll('.editable').forEach(div => {
                 const field = div.getAttribute('data-field');
                 const input = div.querySelector('input');
@@ -523,24 +511,22 @@
             if (cancelBtn) cancelBtn.style.display = 'none';
 
             try {
-                const res = await fetch('/api/update-intersection', {
+                const payload = {
+                    action: "updateData",
+                    route: routeId,
+                    intersection: originalRawName,
+                    updates: updates
+                };
+
+                const res = await fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        route: routeId,
-                        intersection: originalRawName, // Send RAW name to identify the row to update
-                        updates: updates               // Send NEW name to use for the update
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
-                    // Update local data
-                    // We need to found the item in state.DATA
-                    // Note: originalRawName is the STREETSORT key in the data
                     const item = state.DATA.find(i => String(i.Route) === String(routeId) && i.STREETSORT === originalRawName);
-
                     if (item) {
-                        item.STREETSORT = updates.name; // Update with new (decoded/edited) name
+                        item.STREETSORT = updates.name;
                         item.coordinates = updates.coordinates;
                         if (updates.plans) {
                             if (updates.plans['6 car']) item["6 car"] = updates.plans['6 car'];
@@ -549,10 +535,8 @@
                         }
                     }
 
-                    $("intersectionStatus").innerHTML = `<span style="color:var(--success)">Saved successfully!</span>`;
+                    $("intersectionStatus").innerHTML = `<span style="color:var(--success)">Saved to Google Sheets!</span>`;
                     setTimeout(() => $("intersectionStatus").textContent = "", 3000);
-
-                    // Re-render to show updated state (and update data-raw-street for next time)
                     renderIntersections();
 
                 } else {
@@ -570,7 +554,6 @@
             }
         }
 
-        // Debounce search
         let debounceTimer;
         $("intersectionSearch").addEventListener('input', (e) => {
             clearTimeout(debounceTimer);
@@ -798,14 +781,12 @@
                         ? `Enter a nickname for device "${deviceId}":`
                         : `Edit nickname for device "${deviceId}"\nCurrent: "${currentNickname}"`;
 
-                    const newNickname = prompt(prompt_text, deviceId === currentNickname ? "" : currentNickname);
-
+                    const newNickname = prompt(prompt_text);
                     if (newNickname !== null) {
-                        const status = $("status");
-                        status.innerHTML = `Saving... <span class="spinner"></span>`;
                         await saveNicknameToSheets(deviceId, newNickname);
-                        status.innerHTML = `<span style="color:var(--success)">Nickname saved!</span>`;
-                        setTimeout(() => loadLogs(), 500);
+                        // Refresh display
+                        const start = Math.max(0, displayedCount - LOGS_PER_PAGE);
+                        renderLogs(0, displayedCount, true);
                     }
                 });
             });
@@ -813,75 +794,72 @@
 
         window.loadLogs = async function () {
             const status = $("status");
-            const tbody = $("logBody");
-            const mobileBody = $("logBodyMobile");
-            const loadMoreBtn = $("loadMoreBtn");
-
-            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("YOUR_")) {
-                $("configWarning").style.display = "block";
-                status.innerHTML = `<span style="color:var(--danger)">Configuration Missing</span>`;
-                return;
-            }
-
-            status.innerHTML = `Loading from Google Sheets... <span class="spinner"></span>`;
-            if (loadMoreBtn) loadMoreBtn.style.display = 'none';
-
-            await loadNicknamesFromSheets();
+            status.innerHTML = 'Loading logs... <span class="spinner"></span>';
+            $("loadMoreBtn").style.display = "none";
 
             try {
-                const res = await fetch(GOOGLE_SCRIPT_URL);
-                if (!res.ok) throw new Error("Failed to fetch");
+                // Load nicknames first (still from sheets or local)
+                await loadNicknamesFromSheets();
 
-                allLogs = await res.json();
-                displayedCount = 0;
-
-                if (allLogs.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--muted)">No logs found yet.</td></tr>`;
-                    mobileBody.innerHTML = `<div style="text-align:center; padding:20px; color:var(--muted)">No logs found yet.</div>`;
-                    status.textContent = `No logs found.`;
-                } else {
-                    // Load first batch
-                    const initialCount = Math.min(LOGS_PER_PAGE, allLogs.length);
-                    renderLogs(0, initialCount, true);
-                    displayedCount = initialCount;
-
-                    // Show Load More button if there are more logs
-                    if (displayedCount < allLogs.length && loadMoreBtn) {
-                        loadMoreBtn.style.display = 'block';
-                        const remaining = allLogs.length - displayedCount;
-                        loadMoreBtn.textContent = `Load More (${Math.min(LOGS_PER_PAGE, remaining)} of ${remaining} remaining)`;
-                    }
-
-                    status.textContent = `Loaded ${displayedCount} of ${allLogs.length} logs.`;
+                // Fetch logs from local server (legacy behavior)
+                const response = await fetch('/api/logs');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-            } catch (err) {
-                status.innerHTML = `<span style="color:var(--danger)">Error: ${err.message}</span>. Check console & CORS settings.`;
+                const data = await response.json();
+
+                if (!Array.isArray(data)) {
+                    throw new Error("Invalid data format received");
+                }
+
+                allLogs = data;
+                displayedCount = 0;
+                renderLogs(0, LOGS_PER_PAGE, true);
+                displayedCount = Math.min(allLogs.length, LOGS_PER_PAGE);
+
+                status.innerHTML = `Showing ${displayedCount} of ${allLogs.length} logs`;
+                if (allLogs.length > displayedCount) {
+                    $("loadMoreBtn").style.display = "block";
+                }
+            } catch (error) {
+                console.error('Error fetching logs:', error);
+                status.innerHTML = `<span style="color:var(--danger)">Error loading logs: ${error.message}</span>`;
             }
-        };
+        }
 
         window.loadMore = function () {
-            const status = $("status");
-            const loadMoreBtn = $("loadMoreBtn");
-
-            const nextCount = Math.min(displayedCount + LOGS_PER_PAGE, allLogs.length);
+            const nextCount = Math.min(allLogs.length, displayedCount + LOGS_PER_PAGE);
             renderLogs(displayedCount, nextCount, false);
             displayedCount = nextCount;
 
+            $("status").innerHTML = `Showing ${displayedCount} of ${allLogs.length} logs`;
             if (displayedCount >= allLogs.length) {
-                if (loadMoreBtn) loadMoreBtn.style.display = 'none';
-            } else if (loadMoreBtn) {
-                const remaining = allLogs.length - displayedCount;
-                loadMoreBtn.textContent = `Load More (${Math.min(LOGS_PER_PAGE, remaining)} of ${remaining} remaining)`;
+                $("loadMoreBtn").style.display = "none";
             }
-
-            status.textContent = `Loaded ${displayedCount} of ${allLogs.length} logs.`;
-        };
-
-        function escape(s) {
-            return String(s || "").replaceAll("<", "&lt;");
         }
 
-        loadLogs();
+        function escape(str) {
+            if (!str) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Initial load
+        if (sessionStorage.getItem('admin_authenticated') === 'true') {
+            loadLogs();
+        } else {
+            // Wait for auth
+            const checker = setInterval(() => {
+                if (sessionStorage.getItem('admin_authenticated') === 'true') {
+                    clearInterval(checker);
+                    loadLogs();
+                }
+            }, 500);
+        }
     </script>
 </body>
 

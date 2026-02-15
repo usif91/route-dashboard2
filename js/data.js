@@ -23,6 +23,19 @@ export const state = {
     SYN_GROUPS: []        // [{phrases:[...], tokens:Set([...])}]
 };
 
+function safeDecode(s) {
+    if (!s) return "";
+    try {
+        // Repeatedly decode if double encoded
+        let decoded = decodeURIComponent(s);
+        // Try one more time just in case (some legacies were double encoded)
+        if (decoded.includes("%")) {
+            try { decoded = decodeURIComponent(decoded); } catch (e) { }
+        }
+        return decoded;
+    } catch (e) { return s; }
+}
+
 // Loading from Google Sheets now
 export async function loadWorkbook(urlIgnored, setStatusCallback, callback) {
     if (setStatusCallback) setStatusCallback("muted", `Fetching data from Google Sheets… <span class="spinner"></span>`);
@@ -158,8 +171,8 @@ function mergeSheets(sheet1, sheet2) {
 
         const out = {
             Route: row1.Route,
-            YARD: row1[yardKey] ?? null,
-            STREETSORT: row1[streetKey] ?? null,
+            YARD: row1[yardKey] ? safeDecode(row1[yardKey]) : null,
+            STREETSORT: row1[streetKey] ? safeDecode(row1[streetKey]) : null,
             coordinates: row1.coordinates ?? null,
             "6 car": plans["6 car"] ?? null,
             "5 car": plans["5 car"] ?? null,
