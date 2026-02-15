@@ -56,6 +56,7 @@ export async function loadWorkbook(urlIgnored, setStatusCallback, callback) {
         if (callback) callback();
     } catch (err) {
         if (setStatusCallback) setStatusCallback("error", `Could not load data. ${err.message}`);
+        console.error("Data Load Error:", err);
         state.DATA = [];
         if (callback) callback();
     }
@@ -70,7 +71,11 @@ function processSheets(data) {
     state.SYN_TOKEN = new Map();
     state.SYN_GROUPS = [];
 
-    processSynonyms(data.sheet3 || []); // "search" sheet data
+    try {
+        processSynonyms(data.sheet3 || []); // "search" sheet data
+    } catch (e) {
+        console.warn("Synonym processing failed:", e);
+    }
 
     // Direct mapping of Sheet1 to state.DATA
     // We assume Sheet1 has all columns: Route, YARD, STREETSORT, coordinates, 6 car, 4 car, 2 car
