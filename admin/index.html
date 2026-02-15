@@ -80,8 +80,94 @@
                 font-size: 24px;
             }
 
-            table {
+            #adminContent table {
                 display: none;
+            }
+
+            /* Intersections table: card layout on mobile */
+            #intersectionsTable {
+                display: block !important;
+            }
+
+            #intersectionsTable colgroup,
+            #intersectionsTable thead {
+                display: none;
+            }
+
+            #intersectionsTable tbody {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            #intersectionsTable tbody tr {
+                display: flex;
+                flex-wrap: wrap;
+                background: rgba(18, 22, 36, 0.78);
+                border-radius: 12px;
+                padding: 15px;
+                border-left: 3px solid var(--accent);
+                gap: 8px;
+            }
+
+            #intersectionsTable tbody tr td {
+                border: none;
+                padding: 4px 0;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(1) {
+                font-weight: bold;
+                color: var(--accent);
+                width: 60px;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(1)::before {
+                content: 'Route: ';
+                color: var(--muted);
+                font-weight: normal;
+                font-size: 11px;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(2) {
+                width: calc(100% - 80px);
+                font-weight: 500;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(3) {
+                width: 100%;
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+            #intersectionsTable tbody tr td:nth-child(4),
+            #intersectionsTable tbody tr td:nth-child(5),
+            #intersectionsTable tbody tr td:nth-child(6) {
+                flex: 1;
+                text-align: center;
+                font-size: 13px;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(4)::before {
+                content: '6car: ';
+                color: var(--muted);
+                font-size: 10px;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(5)::before {
+                content: '4car: ';
+                color: var(--muted);
+                font-size: 10px;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(6)::before {
+                content: '2car: ';
+                color: var(--muted);
+                font-size: 10px;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(7) {
+                width: 100%;
+                text-align: right;
             }
 
             #logBodyMobile {
@@ -482,14 +568,20 @@
                     input.style.padding = "4px";
 
                     div.innerHTML = '';
-                    div.appendChild(input);
 
                     // Add GPS button for coordinates field
                     if (field === 'coordinates') {
+                        div.style.display = 'flex';
+                        div.style.alignItems = 'center';
+                        div.style.gap = '4px';
+                        input.style.flex = '1';
+                        input.style.minWidth = '0';
+                        div.appendChild(input);
+
                         const gpsBtn = document.createElement('button');
                         gpsBtn.textContent = '📍';
                         gpsBtn.title = 'Use my current location';
-                        gpsBtn.style.cssText = 'margin-left:4px; padding:4px 6px; background:rgba(124,159,255,0.2); border:1px solid var(--accent); color:var(--accent); border-radius:4px; cursor:pointer; font-size:14px;';
+                        gpsBtn.style.cssText = 'flex-shrink:0; padding:4px 6px; background:rgba(124,159,255,0.2); border:1px solid var(--accent); color:var(--accent); border-radius:4px; cursor:pointer; font-size:14px; line-height:1;';
                         gpsBtn.onclick = (e) => {
                             e.preventDefault();
                             gpsBtn.textContent = '⏳';
@@ -507,6 +599,8 @@
                             );
                         };
                         div.appendChild(gpsBtn);
+                    } else {
+                        div.appendChild(input);
                     }
                 });
 
