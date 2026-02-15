@@ -38,11 +38,5 @@ export async function logSearch(query, details = {}) {
                 'Content-Type': 'text/plain;charset=utf-8',
             },
             body: JSON.stringify(payload)
-        }).catch(err => console.error("Log send missed:", err));
-    } catch (e) {
-        // Fallback for very old browsers (unlikely needed but safe)
-        console.error("Logging failed", e);
-    }
-
     console.log("Logged:", query);
-}
+        }
