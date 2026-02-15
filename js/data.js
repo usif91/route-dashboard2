@@ -120,6 +120,49 @@ function processSheets(data) {
     state.DATA = processed;
 }
 
+function processSynonyms(sheet3) {
+    const addTokenSyn = (a, b) => {
+        if (!a || !b) return;
+        if (!state.SYN_TOKEN.has(a)) state.SYN_TOKEN.set(a, new Set([a]));
+        if (!state.SYN_TOKEN.has(b)) state.SYN_TOKEN.set(b, new Set([b]));
+        state.SYN_TOKEN.get(a).add(b);
+        state.SYN_TOKEN.get(b).add(a);
+    };
+
+    for (const row of sheet3) {
+        const phrases = Object.values(row)
+            .map(v => v === null || v === undefined ? "" : String(v))
+            .map(v => normalizeForTokens(v))
+            .filter(v => v);
+
+        if (phrases.length < 2) continue;
+        const uniq = Array.from(new Set(phrases));
+
+        // Simple single-token synonyms
+        for (const term of uniq) {
+            state.synonyms.set(term, uniq);
+        }
+
+        const tokSet = new Set();
+        for (const ph of uniq) {
+            for (const t of ph.split(" ").filter(Boolean)) {
+                if (t !== "AND") tokSet.add(t);
+            }
+        }
+
+        // Best-effort direct token pair if the row is exactly two single tokens
+        if (uniq.length === 2) {
+            const aT = uniq[0].split(" ").filter(Boolean);
+            const bT = uniq[1].split(" ").filter(Boolean);
+            if (aT.length === 1 && bT.length === 1) {
+                addTokenSyn(aT[0], bT[0]);
+            }
+        }
+
+        state.SYN_GROUPS.push({ phrases: uniq, tokens: tokSet });
+    }
+}
+
 function parseCoord(s) {
     if (s === null || s === undefined) return { lat: null, lon: null };
     const txt = String(s).trim().replace(/,+\s*$/, "");
