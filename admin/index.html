@@ -412,8 +412,8 @@
 
             toShow.forEach(item => {
                 const tr = document.createElement('tr');
-                const rawStreet = item.STREETSORT || "";
-                const displayStreet = safeDecode(rawStreet);
+                const rawStreet = item._RAW_STREET || item.STREETSORT || ""; // Use preserved raw name if available
+                const displayStreet = item.STREETSORT || safeDecode(rawStreet); // Already decoded in data.js, but safe fallback
                 const displayCoords = item.coordinates || "";
 
                 tr.setAttribute('data-route-id', item.Route);
@@ -452,7 +452,8 @@
             } else {
                 tr.classList.add('editing');
                 btn.textContent = "Save";
-                btn.style.background = "var(--success)";
+                btn.style.background = "var(--ok)"; // Fixed: was success (undefined)
+
 
                 tr.querySelectorAll('.editable').forEach(div => {
                     const clone = div.cloneNode(true);

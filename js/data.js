@@ -173,6 +173,7 @@ function mergeSheets(sheet1, sheet2) {
             Route: row1.Route,
             YARD: row1[yardKey] ? safeDecode(row1[yardKey]) : null,
             STREETSORT: row1[streetKey] ? safeDecode(row1[streetKey]) : null,
+            _RAW_STREET: row1[streetKey], // Keep original for updates
             coordinates: row1.coordinates ?? null,
             "6 car": plans["6 car"] ?? null,
             "5 car": plans["5 car"] ?? null,
