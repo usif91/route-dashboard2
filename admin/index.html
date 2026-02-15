@@ -678,7 +678,8 @@
                 const isNicknamed = displayName !== deviceId;
 
                 // Strip everything after " (" for the copy value to remove YARD/Division
-                const routeOnly = l.topResultSummary ? l.topResultSummary.split(" (")[0].trim() : "";
+                const topStr = l.topResultSummary != null ? String(l.topResultSummary) : "";
+                const routeOnly = topStr ? topStr.split(" (")[0].trim() : "";
 
                 return `
                 <tr>
@@ -690,7 +691,7 @@
                         </div>
                     </td>
                     <td style="color:var(--accent)">${escape(l.query)}</td>
-                    <td><span class="copy-route" data-route="${escape(routeOnly)}" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted;" title="Click to copy">${escape(l.topResultSummary)}</span></td>
+                    <td><span class="copy-route" data-route="${escape(routeOnly)}" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted;" title="Click to copy">${escape(topStr)}</span></td>
                     <td style="color:#ffd700">${escape(l.sixCar || "-")}</td>
                     <td>${escape(l.intersection)}</td>
                     <td>${mapLink}</td>
@@ -729,7 +730,7 @@
                     </div>
                     <div class="log-card-row">
                         <span class="log-card-label">Result</span>
-                        <span class="log-card-value"><span class="copy-route" data-route="${escape(l.topResultSummary ? l.topResultSummary.split(" (")[0].trim() : "")}" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted;" title="Click to copy">${escape(l.topResultSummary)}</span></span>
+                        <span class="log-card-value"><span class="copy-route" data-route="${escape(l.topResultSummary != null ? String(l.topResultSummary).split(" (")[0].trim() : "")}" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted;" title="Click to copy">${escape(l.topResultSummary != null ? String(l.topResultSummary) : "")}</span></span>
                     </div>
                     ${l.sixCar ? `
                     <div class="log-card-row">
