@@ -16,31 +16,32 @@ export async function logSearch(query, details = {}) {
         return;
     }
 
-    const topResult = details.topResult;
-    const params = new URLSearchParams({
+    const payload = {
+        action: 'log',
         user: getClientId(),
         query: query,
         topResultSummary: topResult ? `${topResult.Route} (${topResult.YARD})` : "No Match",
         intersection: details.intersection || (topResult ? topResult.STREETSORT : ""),
         location: details.location ? `${details.location.lat},${details.location.lon}` : "",
         sixCar: topResult ? (topResult["6 car"] || "") : ""
-    });
+    };
 
-    const fullUrl = `${GOOGLE_SCRIPT_URL}?${params.toString()}`;
-
-    // Strategy 1: Fetch with keepalive (modern standard for logging)
-    // This tells the browser "don't kill this request even if the user closes the tab/switches apps"
+    // Use POST with keepalive to robustly send data to GAS
+    // We use text/plain to avoid preflight CORS issues, GAS parses it fine
     try {
-        fetch(fullUrl, { mode: 'no-cors', keepalive: true }).catch(() => { });
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            cache: 'no-cache',
+            keepalive: true,
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8',
+            },
+            body: JSON.stringify(payload)
+        }).catch(err => console.error("Log send missed:", err));
     } catch (e) {
-        // Strategy 2: Image Beacon (Fallback)
-        // We append it to the body to ensure mobile browsers don't garbage collect it too early
-        const img = new Image();
-        img.src = fullUrl;
-        img.style.display = 'none';
-        document.body.appendChild(img);
-        // Clean up after a while
-        setTimeout(() => img.remove(), 5000);
+        // Fallback for very old browsers (unlikely needed but safe)
+        console.error("Logging failed", e);
     }
 
     console.log("Logged:", query);
