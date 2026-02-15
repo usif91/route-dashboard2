@@ -2,9 +2,7 @@ import { state, loadWorkbook, computeMatches, searchNearMe } from './data.js';
 import { setStatus, updateCounts, renderNext, renderNextNear, renderRows, updateCarHeader } from './ui.js';
 import { escapeHtml } from './utils.js';
 import { logSearch } from './logger.js';
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
+
 
 let logTimeout;
 
@@ -58,13 +56,12 @@ function handleTableClick(e) {
                 const now = new Date();
                 const dateStr = `${now.getMonth() + 1}/${now.getDate()}`;
 
-                SimpleDateFormat sdf = new SimpleDateFormat("M/d hh:mm a", Locale.ENGLISH);
-                String formattedDate = sdf.format(now);
+    
 
 
 
                 // Add new lines as requested
-                textToCopy = `${formattedDate}\n${dateStr}\n${route}\n${street}`.trim();
+                textToCopy = `${dateStr}\n${route}\n${street}`.trim();
             } else {
                 // Home Page: Copy only intersection
                 textToCopy = street.trim();
@@ -175,6 +172,7 @@ loadWorkbook(null, setStatus, () => {
     computeMatches();
     renderNext(true);
 });
+
 
 
 
