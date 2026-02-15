@@ -1,149 +1,235 @@
 function doGet(e) {
-    var params = e.parameter;
-    var action = params.action;
+    const action = e.parameter.action;
 
-    // Handle nickname operations
-    if (action === 'getNicknames') {
+    if (action === "getNicknames") {
         return getNicknames();
-    } else if (action === 'setNickname') {
-        return setNickname(params.deviceId, params.nickname);
     }
 
-    // Original logging and viewing functionality
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Logs') || SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-
-    // If we have a 'query' parameter, it's a LOGGING request
-    if (params.query) {
-        var timestamp = new Date().toISOString();
-
-        // Add header if missing (Updated schema)
-        if (sheet.getLastRow() === 0) {
-            sheet.appendRow(["Timestamp", "IP (Simulated)", "Name (Manual)", "Query", "Top Result", "Intersection", "Location", "6-Car Plan"]);
-        }
-
-        sheet.appendRow([
-            timestamp,
-            "Client",
-            params.user || "Anonymous",
-            params.query,
-            params.topResultSummary || "",
-            params.intersection || "",
-            params.location || "",
-            params.sixCar || ""
-        ]);
-
-        // Return JSON success
-        return ContentService.createTextOutput(JSON.stringify({ status: "logged" }))
-            .setMimeType(ContentService.MimeType.JSON);
+    if (action === "getData") {
+        return getData();
     }
 
-    // Otherwise, it's a VIEW request (Admin Dashboard)
-    var rows = sheet.getDataRange().getValues();
+    return getLogs();
+}
 
-    // Handle empty sheet case
-    if (rows.length < 2) {
-        return ContentService.createTextOutput(JSON.stringify([]))
-            .setMimeType(ContentService.MimeType.JSON);
+function doPost(e) {
+    // Handle POST requests
+    // e.postData.contents is the raw body
+    let data;
+    try {
+        data = JSON.parse(e.postData.contents);
+    } catch (err) {
+        return ContentService.createTextOutput("Invalid JSON").setMimeType(ContentService.MimeType.TEXT);
     }
 
-    var data = rows.slice(1);
-    var logs = data.map(function (row) {
-        return {
-            timestamp: row[0],
-            ip: row[1],
-            user: row[2],
-            query: row[3],
-            topResultSummary: row[4],
-            intersection: row[5],
-            location: row[6],
-            sixCar: row[7]
-        };
-    });
+    const action = e.parameter.action || data.action;
 
-    return ContentService.createTextOutput(JSON.stringify(logs.reverse()))
+    if (action === "log") {
+        return logSearch(data);
+    }
+
+    if (action === "updateData") {
+        return updateData(data);
+    }
+
+    return ContentService.createTextOutput("Unknown action").setMimeType(ContentService.MimeType.TEXT);
+}
+
+// --- EXISTING LOGGING LOGIC (Preserved) ---
+
+function getLogs() {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("logs");
+    if (!sheet) {
+        return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+        return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const headers = data[0];
+    const rows = data.slice(1);
+
+    // Convert to array of objects
+    const result = rows.map(row => {
+        let obj = {};
+        headers.forEach((h, i) => {
+            // Convert header to camelCase or simple lowercase
+            let key = h.toLowerCase().replace(/ /g, "");
+            if (key === "timestamp") obj.timestamp = row[i];
+            else if (key === "user" || key === "deviceid") obj.user = row[i];
+            else if (key === "query") obj.query = row[i];
+            else if (key === "topresult" || key === "topresultsummary") obj.topResultSummary = row[i];
+            else if (key === "6car") obj.sixCar = row[i];
+            else if (key === "intersection") obj.intersection = row[i];
+            else if (key === "location") obj.location = row[i];
+            else obj[key] = row[i];
+        });
+        return obj;
+    }).reverse(); // Newest first
+
+    return ContentService
+        .createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
+}
+
+function logSearch(data) {
+    let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("logs");
+    if (!sheet) {
+        sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet("logs");
+        // Add headers if new
+        sheet.appendRow(["Timestamp", "User", "Query", "Top Result", "6 Car", "Intersection", "Location"]);
+    }
+
+    const timestamp = new Date();
+    sheet.appendRow([
+        timestamp,
+        data.user,
+        data.query,
+        data.topResultSummary,
+        data.sixCar,
+        data.intersection,
+        data.location
+    ]);
+
+    return ContentService.createTextOutput("Logged").setMimeType(ContentService.MimeType.TEXT);
 }
 
 function getNicknames() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var nicknameSheet = ss.getSheetByName('Nicknames');
+    let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("nicknames");
+    if (!sheet) return ContentService.createTextOutput("{}").setMimeType(ContentService.MimeType.JSON);
 
-    // Create the Nicknames sheet if it doesn't exist
-    if (!nicknameSheet) {
-        nicknameSheet = ss.insertSheet('Nicknames');
-        nicknameSheet.appendRow(['Device ID', 'Nickname', 'Last Updated']);
-        nicknameSheet.setFrozenRows(1);
+    const data = sheet.getDataRange().getValues();
+    const map = {};
+    // Skip header
+    for (let i = 1; i < data.length; i++) {
+        map[data[i][0]] = data[i][1];
     }
 
-    var rows = nicknameSheet.getDataRange().getValues();
-
-    // Skip header row
-    if (rows.length < 2) {
-        return ContentService.createTextOutput(JSON.stringify({}))
-            .setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var nicknames = {};
-    for (var i = 1; i < rows.length; i++) {
-        var deviceId = rows[i][0];
-        var nickname = rows[i][1];
-        if (deviceId && nickname) {
-            nicknames[deviceId] = nickname;
-        }
-    }
-
-    return ContentService.createTextOutput(JSON.stringify(nicknames))
-        .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify(map)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function setNickname(deviceId, nickname) {
-    if (!deviceId) {
-        return ContentService.createTextOutput(JSON.stringify({ error: "Device ID required" }))
-            .setMimeType(ContentService.MimeType.JSON);
-    }
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var nicknameSheet = ss.getSheetByName('Nicknames');
+// --- NEW DATA (INTERSECTIONS) LOGIC ---
 
-    // Create the Nicknames sheet if it doesn't exist
-    if (!nicknameSheet) {
-        nicknameSheet = ss.insertSheet('Nicknames');
-        nicknameSheet.appendRow(['Device ID', 'Nickname', 'Last Updated']);
-        nicknameSheet.setFrozenRows(1);
-    }
+function getData() {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet1 = ss.getSheetByName("data");
+    const sheet3 = ss.getSheetByName("search"); // "search" sheet maps to old "sheet3" (synonyms)
 
-    var rows = nicknameSheet.getDataRange().getValues();
-    var deviceRow = -1;
+    const data1 = sheet1 ? sheet1.getDataRange().getValues() : [];
+    const data3 = sheet3 ? sheet3.getDataRange().getValues() : [];
 
-    // Find if device already has a nickname
-    for (var i = 1; i < rows.length; i++) {
-        if (rows[i][0] === deviceId) {
-            deviceRow = i + 1; // +1 because rows are 1-indexed in Sheets
+    // We need to return the raw arrays so the frontend can proces them (mergeSheets logic)
+    // OR we can merge them here. Merging here reduces frontend complexity.
+
+    const result = {
+        sheet1: arrayToObjects(data1), // Main Data
+        sheet3: arrayToObjects(data3)  // Synonyms (Search)
+    };
+
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function arrayToObjects(data) {
+    if (!data || data.length === 0) return [];
+    const headers = data[0];
+    return data.slice(1).map(row => {
+        let obj = {};
+        headers.forEach((h, i) => {
+            obj[h] = row[i];
+        });
+        return obj;
+    });
+}
+
+function updateData(req) {
+    // req: { route: 123, intersection: "1ST ST", updates: { name, coordinates, plans: {...} } }
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet1 = ss.getSheetByName("data");
+
+    if (!sheet1) return ContentService.createTextOutput("Sheet 'data' not found").setMimeType(ContentService.MimeType.TEXT);
+
+    const data = sheet1.getDataRange().getValues();
+    const headers = data[0];
+
+    // Find column indices
+    const routeIdx = headers.findIndex(h => h.toLowerCase() === "route");
+    const streetIdx = headers.findIndex(h => h.toLowerCase().includes("street") || h === "STREETSORT");
+    const coordIdx = headers.findIndex(h => h.toLowerCase().includes("coord"));
+    // Plan columns (6 car, 4 car, etc) might be in Sheet1 or Sheet2.
+    // The data.js merge logic implies plans are in Sheet2 usually, or mixed.
+    // We need to check where the keys are.
+
+    let rowIdx = -1;
+
+    // Find the row matches route and street (using original name)
+    for (let i = 1; i < data.length; i++) {
+        const rRoute = data[i][routeIdx];
+        const rStreet = data[i][streetIdx];
+
+        // Loose comparison for route, strict for street
+        if (String(rRoute) == String(req.route) && rStreet === req.intersection) {
+            rowIdx = i;
             break;
         }
     }
 
-    var timestamp = new Date().toISOString();
-
-    if (deviceRow > 0) {
-        // Update existing row
-        if (nickname && nickname.trim()) {
-            nicknameSheet.getRange(deviceRow, 2).setValue(nickname.trim());
-            nicknameSheet.getRange(deviceRow, 3).setValue(timestamp);
-        } else {
-            // Delete row if nickname is empty
-            nicknameSheet.deleteRow(deviceRow);
-        }
-    } else if (nickname && nickname.trim()) {
-        // Add new row
-        nicknameSheet.appendRow([deviceId, nickname.trim(), timestamp]);
+    if (rowIdx === -1) {
+        return ContentService.createTextOutput("Row not found").setMimeType(ContentService.MimeType.TEXT).setStatusCode(404);
     }
 
-    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
-        .setMimeType(ContentService.MimeType.JSON);
+    // Update Sheet1
+    if (req.updates.name !== undefined && streetIdx !== -1) {
+        sheet1.getRange(rowIdx + 1, streetIdx + 1).setValue(req.updates.name);
+    }
+    if (req.updates.coordinates !== undefined && coordIdx !== -1) {
+        sheet1.getRange(rowIdx + 1, coordIdx + 1).setValue(req.updates.coordinates);
+    }
+
+    // If plans are in Sheet1, update them. If in Sheet2, update there.
+    // For simplicity, we try finding columns in Sheet1 first.
+    if (req.updates.plans) {
+        for (const [key, val] of Object.entries(req.updates.plans)) {
+            // key is "6 car", "4 car" etc.
+            let colIdx = headers.findIndex(h => h.toLowerCase() === key.toLowerCase() || h.toLowerCase().includes(key.toLowerCase()));
+            if (colIdx !== -1) {
+                sheet1.getRange(rowIdx + 1, colIdx + 1).setValue(val);
+            } else {
+                // Check Sheet2 (search)
+                updateSheet2(ss, req.route, key, val);
+            }
+        }
+    }
+
+    return ContentService.createTextOutput("Updated").setMimeType(ContentService.MimeType.TEXT);
 }
 
-function doPost(e) {
-    // Fallback to doGet logic if someone sends POST
-    return doGet(e);
+function updateSheet2(ss, route, planKey, value) {
+    const sheet2 = ss.getSheetByName("search"); // Updated to 'search'
+    if (!sheet2) return;
+
+    const data = sheet2.getDataRange().getValues();
+    const headers = data[0];
+    const routeIdx = headers.findIndex(h => h.toLowerCase() === "route");
+
+    // Find column for planKey (e.g. "1" for "1 car", or "6" for "6 car" if headers are just numbers)
+    // Mapping keys "6 car" -> "6", "4 car" -> "4" might be needed based on sheet structure
+    // We try fuzzy matching header
+    const digit = planKey.replace(/\D/g, "");
+    const colIdx = headers.findIndex(h => {
+        const s = String(h).toLowerCase();
+        return s === digit || s === `${digit}.0` || (s.includes(digit) && s.includes("car"));
+    });
+
+    if (colIdx === -1 || routeIdx === -1) return;
+
+    // Find row
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][routeIdx]) == String(route)) {
+            sheet2.getRange(i + 1, colIdx + 1).setValue(value);
+            return;
+        }
+    }
 }

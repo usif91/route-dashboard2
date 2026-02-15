@@ -814,7 +814,7 @@
 
                 // Fetch logs from Google Sheets
                 // The script returns logs by default or with action=getLogs (implicit)
-                const response = await fetch(GOOGLE_SCRIPT_URL);
+                const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getLogs`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }

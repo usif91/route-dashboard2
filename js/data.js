@@ -70,7 +70,7 @@ function processSheets(data) {
     state.SYN_TOKEN = new Map();
     state.SYN_GROUPS = [];
 
-    // processSynonyms(sheet3); // preserved if needed later
+    processSynonyms(data.sheet3 || []); // "search" sheet data
 
     // Direct mapping of Sheet1 to state.DATA
     // We assume Sheet1 has all columns: Route, YARD, STREETSORT, coordinates, 6 car, 4 car, 2 car
