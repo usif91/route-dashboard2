@@ -6,7 +6,7 @@ import { logSearch } from './logger.js';
 let logTimeout;
 
 const $ = (id) => document.getElementById(id);
-const EXCEL_FILE = "data.xlsx";
+const EXCEL_FILE = null; // Deprecated - using Google Sheets via config.js
 
 async function copyText(text) {
     try {
@@ -161,7 +161,7 @@ $("btnNear").addEventListener("click", () => {
 $("tbody").addEventListener("click", handleTableClick);
 
 // Init
-loadWorkbook(EXCEL_FILE, setStatus, () => {
+loadWorkbook(null, setStatus, () => {
     updateCounts();
     updateCarHeader(); // Dynamic header text
     computeMatches();

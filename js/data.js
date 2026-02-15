@@ -23,47 +23,41 @@ export const state = {
     SYN_GROUPS: []        // [{phrases:[...], tokens:Set([...])}]
 };
 
-export async function loadWorkbook(url, setStatusCallback, callback) {
-    if (setStatusCallback) setStatusCallback("muted", `Loading ${url}… <span class="spinner"></span>`);
+// Loading from Google Sheets now
+export async function loadWorkbook(urlIgnored, setStatusCallback, callback) {
+    if (setStatusCallback) setStatusCallback("muted", `Fetching data from Google Sheets… <span class="spinner"></span>`);
     try {
-        const resp = await fetch(url, { cache: "no-store" });
-        if (!resp.ok) throw new Error(`Fetch failed (${resp.status})`);
-        const buf = await resp.arrayBuffer();
-        // Access XLSX from global scope (loaded via script tag)
-        const wb = window.XLSX.read(buf, { type: "array" });
+        // We ignore 'urlIgnored' (which was data.xlsx) and use the config URL
+        // Import dynamically to avoid circular dep issues if config imports data (it doesn't, but safe practice)
+        const { GOOGLE_SCRIPT_URL } = await import('./config.js');
 
-        processWorkbook(wb);
+        const resp = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
+        if (!resp.ok) throw new Error(`Fetch failed (${resp.status})`);
+
+        const json = await resp.json();
+        // json should be { sheet1: [...], sheet2: [...] }
+
+        processSheets(json);
 
         if (setStatusCallback) setStatusCallback("ok", `Loaded ${state.DATA.length.toLocaleString()} rows.`);
         if (callback) callback();
     } catch (err) {
-        if (setStatusCallback) setStatusCallback("error", `Could not load ${url}. ${err.message}`);
+        if (setStatusCallback) setStatusCallback("error", `Could not load data. ${err.message}`);
         state.DATA = [];
         if (callback) callback();
     }
 }
 
-function processWorkbook(wb) {
-    const s1name = wb.SheetNames[0];
-    const s2name = wb.SheetNames[1];
-    const s1 = wb.Sheets[s1name];
-    const s2 = wb.Sheets[s2name];
+function processSheets(data) {
+    // data.sheet1 and data.sheet2 are already arrays of objects
+    const sheet1 = data.sheet1 || [];
+    const sheet2 = data.sheet2 || [];
 
-    const sheet1 = window.XLSX.utils.sheet_to_json(s1, { defval: null });
-    const sheet2 = window.XLSX.utils.sheet_to_json(s2, { defval: null });
-
-    // Sheet3: alternatives/synonyms (optional)
+    // Sheet3 logic (synonyms) - mostly skipped in GAS for now, or we can add it later.
+    // Preserving existing structure
     state.synonyms = new Map();
     state.SYN_TOKEN = new Map();
     state.SYN_GROUPS = [];
-
-    if (wb.SheetNames.length >= 3) {
-        const s3 = wb.Sheets[wb.SheetNames[2]];
-        if (s3) {
-            const sheet3 = window.XLSX.utils.sheet_to_json(s3, { defval: null });
-            processSynonyms(sheet3);
-        }
-    }
 
     mergeSheets(sheet1, sheet2);
 }
