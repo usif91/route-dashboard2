@@ -55,8 +55,13 @@ function handleTableClick(e) {
                 const now = new Date();
                 const dateStr = `${now.getMonth() + 1}/${now.getDate()}`;
 
+                SimpleDateFormat sdf = new SimpleDateFormat("M/d hh:mm a", Locale.ENGLISH);
+                String formattedDate = sdf.format(now);
+
+
+
                 // Add new lines as requested
-                textToCopy = `${dateStr}\n${route}\n${street}`.trim();
+                textToCopy = `${formattedDate}\n${dateStr}\n${route}\n${street}`.trim();
             } else {
                 // Home Page: Copy only intersection
                 textToCopy = street.trim();
@@ -167,3 +172,4 @@ loadWorkbook(null, setStatus, () => {
     computeMatches();
     renderNext(true);
 });
+
