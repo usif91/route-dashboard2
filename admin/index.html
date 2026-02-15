@@ -368,6 +368,16 @@
             try { return decodeURIComponent(s); } catch (e) { return s; }
         }
 
+        function escapeHtml(str) {
+            if (!str) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         window.showLogs = function () {
             document.querySelector('#adminContent > .admin-wrap').style.display = 'block';
             document.getElementById('intersectionsContent').style.display = 'none';
@@ -423,11 +433,11 @@
 
                 tr.innerHTML = `
                     <td>${item.Route || ''}</td>
-                    <td><div class="editable" data-field="name">${escape(displayStreet)}</div></td>
-                    <td><div class="editable" data-field="coordinates">${escape(displayCoords)}${mapLink}</div></td>
-                    <td><div class="editable" data-field="6 car">${escape(item["6 car"])}</div></td>
-                    <td><div class="editable" data-field="4 car">${escape(item["4 car"])}</div></td>
-                    <td><div class="editable" data-field="2 car">${escape(item["2 car"])}</div></td>
+                    <td><div class="editable" data-field="name">${escapeHtml(displayStreet)}</div></td>
+                    <td><div class="editable" data-field="coordinates">${escapeHtml(displayCoords)}${mapLink}</div></td>
+                    <td><div class="editable" data-field="6 car">${escapeHtml(item["6 car"])}</div></td>
+                    <td><div class="editable" data-field="4 car">${escapeHtml(item["4 car"])}</div></td>
+                    <td><div class="editable" data-field="2 car">${escapeHtml(item["2 car"])}</div></td>
                     <td>
                         <button class="edit-btn" style="background:var(--accent); color:var(--bg); border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" onclick="toggleEdit(this)">Edit</button>
                     </td>
