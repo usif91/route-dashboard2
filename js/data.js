@@ -48,6 +48,7 @@ export async function loadWorkbook(urlIgnored, setStatusCallback, callback) {
         if (!resp.ok) throw new Error(`Fetch failed (${resp.status})`);
 
         const json = await resp.json();
+        console.log("Received Data Structure:", json);
         // json should be { sheet1: [...], sheet2: [...] }
 
         processSheets(json);
