@@ -799,17 +799,30 @@
             $("loadMoreBtn").style.display = "none";
 
             try {
-                // Load nicknames first (still from sheets or local)
+                if (!GOOGLE_SCRIPT_URL) {
+                    throw new Error("Configuration missing. Please set GOOGLE_SCRIPT_URL in js/config.js");
+                }
+
+                if (GOOGLE_SCRIPT_URL.includes("YOUR_")) {
+                    document.getElementById('configWarning').style.display = 'block';
+                    status.innerHTML = "";
+                    return;
+                }
+
+                // Load nicknames first
                 await loadNicknamesFromSheets();
 
-                // Fetch logs from local server (legacy behavior)
-                const response = await fetch('/api/logs');
+                // Fetch logs from Google Sheets
+                // The script returns logs by default or with action=getLogs (implicit)
+                const response = await fetch(GOOGLE_SCRIPT_URL);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
 
                 if (!Array.isArray(data)) {
+                    // Try to handle if it returned an error object
+                    if (data.status === "error") throw new Error(data.message);
                     throw new Error("Invalid data format received");
                 }
 

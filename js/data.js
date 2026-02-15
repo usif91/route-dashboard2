@@ -62,133 +62,62 @@ export async function loadWorkbook(urlIgnored, setStatusCallback, callback) {
 }
 
 function processSheets(data) {
-    // data.sheet1 and data.sheet2 are already arrays of objects
+    // data.sheet1 is the source of truth now
     const sheet1 = data.sheet1 || [];
-    const sheet2 = data.sheet2 || [];
 
     // Sheet3 logic (synonyms) - mostly skipped in GAS for now, or we can add it later.
-    // Preserving existing structure
     state.synonyms = new Map();
     state.SYN_TOKEN = new Map();
     state.SYN_GROUPS = [];
 
-    mergeSheets(sheet1, sheet2);
-}
+    // processSynonyms(sheet3); // preserved if needed later
 
-function processSynonyms(sheet3) {
-    const addTokenSyn = (a, b) => {
-        if (!a || !b) return;
-        if (!state.SYN_TOKEN.has(a)) state.SYN_TOKEN.set(a, new Set([a]));
-        if (!state.SYN_TOKEN.has(b)) state.SYN_TOKEN.set(b, new Set([b]));
-        state.SYN_TOKEN.get(a).add(b);
-        state.SYN_TOKEN.get(b).add(a);
-    };
+    // Direct mapping of Sheet1 to state.DATA
+    // We assume Sheet1 has all columns: Route, YARD, STREETSORT, coordinates, 6 car, 4 car, 2 car
 
-    for (const row of sheet3) {
-        const phrases = Object.values(row)
-            .map(v => v === null || v === undefined ? "" : String(v))
-            .map(v => normalizeForTokens(v))
-            .filter(v => v);
-
-        if (phrases.length < 2) continue;
-        const uniq = Array.from(new Set(phrases));
-
-        // Simple single-token synonyms
-        for (const term of uniq) {
-            state.synonyms.set(term, uniq);
-        }
-
-        const tokSet = new Set();
-        for (const ph of uniq) {
-            for (const t of ph.split(" ").filter(Boolean)) {
-                if (t !== "AND") tokSet.add(t);
-            }
-        }
-
-        // Best-effort direct token pair if the row is exactly two single tokens
-        if (uniq.length === 2) {
-            const aT = uniq[0].split(" ").filter(Boolean);
-            const bT = uniq[1].split(" ").filter(Boolean);
-            if (aT.length === 1 && bT.length === 1) {
-                addTokenSyn(aT[0], bT[0]);
-            }
-        }
-
-        state.SYN_GROUPS.push({ phrases: uniq, tokens: tokSet });
-    }
-}
-
-function mergeSheets(sheet1, sheet2) {
-    const routeKey1 = sheet1.length ? (("Route" in sheet1[0]) ? "Route" : Object.keys(sheet1[0])[0]) : "Route";
-    const routeKey2 = sheet2.length ? (("Route" in sheet2[0]) ? "Route" : Object.keys(sheet2[0])[0]) : "Route";
-
-    const unnamed6 = sheet2.length ? Object.keys(sheet2[0]).find(k => k.toLowerCase().includes("unnamed") && k.includes("6")) : null;
-
-    // Helper to fuzzy find key in row object
-    const findKey = (row, digits) => Object.keys(row).find(k => {
-        const s = String(k).trim().toLowerCase();
-        return s === digits || s === `${digits}.0` || (s.includes(digits) && s.includes("car"));
-    });
-
-    const map2 = new Map();
-
-    for (const r of sheet2) {
-        const route = Number(r[routeKey2]);
-        if (!Number.isFinite(route)) continue;
-        const row = { ...r };
-        row.Route = route;
-
-        // Normalize the car keys
-        row.__plans = {};
-        for (const d of ["1", "2", "3", "4", "5", "6"]) {
-            const k = findKey(r, d);
-            if (k) row.__plans[`${d} car`] = r[k];
-        }
-
-        if (unnamed6 && !row.__plans["1 car"]) {
-            row.__plans["1 car"] = row[unnamed6];
-        }
-
-        map2.set(route, row);
-    }
-
-    // Helper to find column case-insensitively
+    // Helper to find column case-insensitively if needed, though usually keys are stable
     const findCol = (row, name) => Object.keys(row).find(k => k.toLowerCase().includes(name.toLowerCase()));
 
-    const yardKey = sheet1.length ? (("YARD" in sheet1[0]) ? "YARD" : findCol(sheet1[0], "yard")) : "YARD";
-    const streetKey = sheet1.length ? (("STREETSORT" in sheet1[0]) ? "STREETSORT" : findCol(sheet1[0], "street")) : "STREETSORT";
+    const processed = [];
+    if (sheet1.length > 0) {
+        // Detect keys once
+        const ex = sheet1[0];
+        const routeKey = ("Route" in ex) ? "Route" : Object.keys(ex)[0]; // First col usually Route
+        const yardKey = ("YARD" in ex) ? "YARD" : (findCol(ex, "yard") || "YARD");
+        const streetKey = ("STREETSORT" in ex) ? "STREETSORT" : (findCol(ex, "street") || "STREETSORT");
 
-    const merged = [];
-    for (const r of sheet1) {
-        const route = Number(r[routeKey1]);
-        if (!Number.isFinite(route)) continue;
+        // Plan keys: "6 car", "4 car", "2 car" (or "1 car", "3 car", "5 car")
+        const plans = ["6 car", "5 car", "4 car", "3 car", "2 car", "1 car"];
+        const planKeys = {};
+        plans.forEach(p => {
+            planKeys[p] = (p in ex) ? p : (findCol(ex, p) || p);
+        });
 
-        const row1 = { ...r };
-        row1.Route = route;
+        for (const r of sheet1) {
+            const route = Number(r[routeKey]);
+            if (!Number.isFinite(route)) continue;
 
-        const row2 = map2.get(route) || { __plans: {} };
-        const plans = row2.__plans || {};
+            const out = {
+                Route: route,
+                YARD: r[yardKey] ? safeDecode(r[yardKey]) : null,
+                STREETSORT: r[streetKey] ? safeDecode(r[streetKey]) : null,
+                _RAW_STREET: r[streetKey], // Keep original for updates
+                coordinates: r.coordinates ?? null,
+            };
 
-        const out = {
-            Route: row1.Route,
-            YARD: row1[yardKey] ? safeDecode(row1[yardKey]) : null,
-            STREETSORT: row1[streetKey] ? safeDecode(row1[streetKey]) : null,
-            _RAW_STREET: row1[streetKey], // Keep original for updates
-            coordinates: row1.coordinates ?? null,
-            "6 car": plans["6 car"] ?? null,
-            "5 car": plans["5 car"] ?? null,
-            "4 car": plans["4 car"] ?? null,
-            "3 car": plans["3 car"] ?? null,
-            "2 car": plans["2 car"] ?? null,
-            "1 car": plans["1 car"] ?? null,
-        };
+            // Map plans
+            plans.forEach(p => {
+                out[p] = r[planKeys[p]] ?? null;
+            });
 
-        const { lat, lon } = parseCoord(out.coordinates);
-        out.lat = lat; out.lon = lon;
+            const { lat, lon } = parseCoord(out.coordinates);
+            out.lat = lat; out.lon = lon;
 
-        merged.push(out);
+            processed.push(out);
+        }
     }
-    state.DATA = merged;
+
+    state.DATA = processed;
 }
 
 function parseCoord(s) {
