@@ -98,12 +98,13 @@ function getLogs() {
             // Convert header to camelCase or simple lowercase
             let key = h.toLowerCase().replace(/ /g, "");
             if (key === "timestamp") obj.timestamp = row[i];
+            else if (key === "source") obj.source = row[i];
             else if (key === "user" || key === "deviceid") obj.user = row[i];
             else if (key === "query") obj.query = row[i];
             else if (key === "topresult" || key === "topresultsummary") obj.topResultSummary = row[i];
-            else if (key === "6car") obj.sixCar = row[i];
             else if (key === "intersection") obj.intersection = row[i];
             else if (key === "location") obj.location = row[i];
+            else if (key === "6car") obj.sixCar = row[i];
             else obj[key] = row[i];
         });
         return obj;
@@ -119,18 +120,19 @@ function logSearch(data) {
     if (!sheet) {
         sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet("logs");
         // Add headers if new
-        sheet.appendRow(["Timestamp", "User", "Query", "Top Result", "6 Car", "Intersection", "Location"]);
+        sheet.appendRow(["Timestamp", "Source", "User", "Query", "Top Result", "Intersection", "Location", "6 Car"]);
     }
 
-    const timestamp = new Date();
+    const timestamp = new Date().toISOString();
     sheet.appendRow([
         timestamp,
+        data.source || "Client",
         data.user,
         data.query,
         data.topResultSummary,
-        data.sixCar,
         data.intersection,
-        data.location
+        data.location,
+        data.sixCar
     ]);
 
     return ContentService.createTextOutput("Logged").setMimeType(ContentService.MimeType.TEXT);

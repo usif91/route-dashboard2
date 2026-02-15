@@ -4,7 +4,7 @@ function getClientId() {
     let id = localStorage.getItem('dashboard_client_id');
     if (!id) {
         // Generate a unique device ID with timestamp for uniqueness
-        id = 'device-' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36).substr(-4);
+        id = 'User-' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36).substr(-4);
         localStorage.setItem('dashboard_client_id', id);
     }
     return id;
@@ -19,6 +19,7 @@ export async function logSearch(query, details = {}) {
     const topResult = details.topResult;
     const payload = {
         action: 'log',
+        source: 'Client',
         user: getClientId(),
         query: query,
         topResultSummary: topResult ? `${topResult.Route} (${topResult.YARD})` : "No Match",
