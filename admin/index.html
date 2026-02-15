@@ -470,6 +470,7 @@
                     const link = clone.querySelector('a');
                     if (link) link.remove();
                     const val = clone.innerText.trim();
+                    const field = div.getAttribute('data-field');
 
                     const input = document.createElement('input');
                     input.type = 'text';
@@ -482,6 +483,31 @@
 
                     div.innerHTML = '';
                     div.appendChild(input);
+
+                    // Add GPS button for coordinates field
+                    if (field === 'coordinates') {
+                        const gpsBtn = document.createElement('button');
+                        gpsBtn.textContent = '📍';
+                        gpsBtn.title = 'Use my current location';
+                        gpsBtn.style.cssText = 'margin-left:4px; padding:4px 6px; background:rgba(124,159,255,0.2); border:1px solid var(--accent); color:var(--accent); border-radius:4px; cursor:pointer; font-size:14px;';
+                        gpsBtn.onclick = (e) => {
+                            e.preventDefault();
+                            gpsBtn.textContent = '⏳';
+                            navigator.geolocation.getCurrentPosition(
+                                (pos) => {
+                                    input.value = `${pos.coords.latitude}, ${pos.coords.longitude}`;
+                                    gpsBtn.textContent = '✅';
+                                    setTimeout(() => { gpsBtn.textContent = '📍'; }, 1500);
+                                },
+                                (err) => {
+                                    alert('Could not get location: ' + err.message);
+                                    gpsBtn.textContent = '📍';
+                                },
+                                { enableHighAccuracy: true, timeout: 8000 }
+                            );
+                        };
+                        div.appendChild(gpsBtn);
+                    }
                 });
 
                 const cancelBtn = document.createElement('button');
