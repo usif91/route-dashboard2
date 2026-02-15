@@ -16,6 +16,7 @@ export async function logSearch(query, details = {}) {
         return;
     }
 
+    const topResult = details.topResult;
     const payload = {
         action: 'log',
         user: getClientId(),
@@ -38,5 +39,10 @@ export async function logSearch(query, details = {}) {
                 'Content-Type': 'text/plain;charset=utf-8',
             },
             body: JSON.stringify(payload)
+        }).catch(err => console.error("Log send missed:", err));
+    } catch (e) {
+        console.error("Logging failed", e);
+    }
+
     console.log("Logged:", query);
-        }
+}
