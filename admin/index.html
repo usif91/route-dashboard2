@@ -141,7 +141,9 @@
 
             #intersectionsTable tbody tr td:nth-child(4),
             #intersectionsTable tbody tr td:nth-child(5),
-            #intersectionsTable tbody tr td:nth-child(6) {
+            #intersectionsTable tbody tr td:nth-child(6),
+            #intersectionsTable tbody tr td:nth-child(7),
+            #intersectionsTable tbody tr td:nth-child(8) {
                 flex: 1;
                 text-align: center;
                 font-size: 13px;
@@ -154,20 +156,41 @@
             }
 
             #intersectionsTable tbody tr td:nth-child(5)::before {
-                content: '4car: ';
+                content: '5car: ';
                 color: var(--muted);
                 font-size: 10px;
             }
 
             #intersectionsTable tbody tr td:nth-child(6)::before {
+                content: '4car: ';
+                color: var(--muted);
+                font-size: 10px;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(7)::before {
+                content: '3car: ';
+                color: var(--muted);
+                font-size: 10px;
+            }
+
+            #intersectionsTable tbody tr td:nth-child(8)::before {
                 content: '2car: ';
                 color: var(--muted);
                 font-size: 10px;
             }
 
-            #intersectionsTable tbody tr td:nth-child(7) {
+            #intersectionsTable tbody tr td:nth-child(9) {
                 width: 100%;
                 text-align: right;
+            }
+
+            /* GPS button sizing on mobile */
+            .gps-btn {
+                width: 32px !important;
+                min-width: 32px !important;
+                height: 32px !important;
+                padding: 2px !important;
+                font-size: 12px !important;
             }
 
             #logBodyMobile {
@@ -343,13 +366,15 @@
         <div class="card table-wrapper" style="box-shadow:none; background:transparent; border:none;">
             <table id="intersectionsTable">
                 <colgroup>
-                    <col style="width:10%">
-                    <col style="width:25%">
-                    <col style="width:20%">
-                    <col style="width:10%">
-                    <col style="width:10%">
-                    <col style="width:10%">
-                    <col style="width:15%">
+                    <col style="width:8%">
+                    <col style="width:22%">
+                    <col style="width:16%">
+                    <col style="width:8%">
+                    <col style="width:8%">
+                    <col style="width:8%">
+                    <col style="width:8%">
+                    <col style="width:8%">
+                    <col style="width:14%">
                 </colgroup>
                 <thead>
                     <tr>
@@ -357,7 +382,9 @@
                         <th>Intersection</th>
                         <th>Coordinates</th>
                         <th>6 Car</th>
+                        <th>5 Car</th>
                         <th>4 Car</th>
+                        <th>3 Car</th>
                         <th>2 Car</th>
                         <th>Actions</th>
                     </tr>
@@ -522,7 +549,9 @@
                     <td><div class="editable" data-field="name">${escapeHtml(displayStreet)}</div></td>
                     <td><div class="editable" data-field="coordinates">${escapeHtml(displayCoords)}${mapLink}</div></td>
                     <td><div class="editable" data-field="6 car">${escapeHtml(item["6 car"])}</div></td>
+                    <td><div class="editable" data-field="5 car">${escapeHtml(item["5 car"])}</div></td>
                     <td><div class="editable" data-field="4 car">${escapeHtml(item["4 car"])}</div></td>
+                    <td><div class="editable" data-field="3 car">${escapeHtml(item["3 car"])}</div></td>
                     <td><div class="editable" data-field="2 car">${escapeHtml(item["2 car"])}</div></td>
                     <td>
                         <button class="edit-btn" style="background:var(--accent); color:var(--bg); border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" onclick="toggleEdit(this)">Edit</button>
@@ -534,7 +563,7 @@
             if ((query.length > 0 && state.matches.length > 100) || (query.length === 0 && state.DATA.length > 100)) {
                 const warning = document.createElement('tr');
                 const total = query.length === 0 ? state.DATA.length : state.matches.length;
-                warning.innerHTML = `<td colspan="7" style="text-align:center; color:var(--muted);">Showing 100 of ${total.toLocaleString()}. Use search to find specific locations.</td>`;
+                warning.innerHTML = `<td colspan="9" style="text-align:center; color:var(--muted);">Showing 100 of ${total.toLocaleString()}. Use search to find specific locations.</td>`;
                 tbody.appendChild(warning);
             }
         }
@@ -581,6 +610,7 @@
                         const gpsBtn = document.createElement('button');
                         gpsBtn.textContent = '📍';
                         gpsBtn.title = 'Use my current location';
+                        gpsBtn.className = 'gps-btn';
                         gpsBtn.style.cssText = 'flex-shrink:0; padding:4px 6px; background:rgba(124,159,255,0.2); border:1px solid var(--accent); color:var(--accent); border-radius:4px; cursor:pointer; font-size:14px; line-height:1;';
                         gpsBtn.onclick = (e) => {
                             e.preventDefault();
